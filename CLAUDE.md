@@ -75,7 +75,7 @@ res://
 
 | Phase | System | Description | Status |
 |-------|--------|-------------|--------|
-| 1 | **Hex Grid** | Dual grid system, coordinate math, visual debug overlay | Pending |
+| 1 | **Hex Grid** | Dual grid system, coordinate math, visual debug overlay | **Done** |
 | 2 | **Hero + Camera** | WASD movement on grid, hero-locked camera with zoom | Pending |
 | 3 | **Day/Night Cycle** | State machine: Night → Day → Night, manual day trigger | Pending |
 | 4 | **Building Placement** | Hero walks to hex, place/upgrade buildings at night | Pending |
@@ -86,6 +86,21 @@ res://
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** Pre-production complete, ready for Phase 1
-- **Completed:** Project setup, CLAUDE.md, GitHub repo, GDD, market research, roadmap
-- **Next:** Phase 1 — Hex Grid system (detail design → implement)
+- **Phase:** Phase 1 complete, ready for Phase 2
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid)
+- **Next:** Phase 2 — Hero + Camera (WASD movement on grid, hero-locked camera)
+
+## Phase 1 Details (Hex Grid)
+- **Grid type:** Pointy-top hex grid (axial coordinates q, r)
+- **Dual grid:** Each large pointy-top tile contains 7 flat-top inner slots (1 center + 6 ring)
+- **Inner slots:** Flat-top hexes arranged as rosette — naturally forms pointy-top silhouette from outside
+- **Perfect fit math:** slot_radius = hex_size * 3/5, slot_size = slot_radius / sqrt(3)
+- **Map size:** ~40 hex diameter (map_radius = 20)
+- **Hero:** Occupies 1 large tile (not a slot)
+- **Files:**
+  - `scripts/core/hex_helper.gd` — Static hex math (coord conversion, neighbors, distance, line, geometry)
+  - `scripts/core/hex_tile.gd` — Tile data (terrain, 7 slot states, occupancy)
+  - `scripts/core/hex_grid.gd` — Grid manager (tile storage, queries, world↔hex conversion)
+  - `scripts/core/grid_visual.gd` — Debug rendering (outlines, hover, slot display)
+  - `scripts/core/game_camera.gd` — Pan (WASD/arrows/middle-drag) + smooth zoom
+  - `scenes/main/game.tscn` — Main scene (HexGrid + GridVisual + GameCamera)
