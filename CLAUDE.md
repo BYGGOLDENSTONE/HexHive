@@ -77,7 +77,7 @@ res://
 |-------|--------|-------------|--------|
 | 1 | **Hex Grid** | Dual grid system, coordinate math, visual debug overlay | **Done** |
 | 2 | **Hero + Camera** | WASD movement on grid, hero-locked camera with zoom | **Done** |
-| 3 | **Day/Night Cycle** | State machine: Night → Day → Night, manual day trigger | Pending |
+| 3 | **Day/Night Cycle** | State machine: Night → Day → Night, manual day trigger | **Done** |
 | 4 | **Building Placement** | Hero walks to hex, place/upgrade buildings at night | Pending |
 | 5 | **Combat Basics** | Enemy spawning, hero auto-attack, basic enemy AI | Pending |
 | 6 | **Economy (Honey)** | Enemy drops, flower collection, spending on buildings | Pending |
@@ -86,9 +86,9 @@ res://
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** Phase 2 complete, ready for Phase 3
-- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid), Phase 2 (Hero + Camera)
-- **Next:** Phase 3 — Day/Night Cycle (state machine, manual day trigger)
+- **Phase:** Phase 3 complete, ready for Phase 4
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid), Phase 2 (Hero + Camera), Phase 3 (Day/Night Cycle)
+- **Next:** Phase 4 — Building Placement (hero walks to hex, place/upgrade buildings at night)
 
 ## Phase 1 Details (Hex Grid)
 - **Grid type:** Pointy-top hex grid (axial coordinates q, r)
@@ -115,3 +115,21 @@ res://
   - `scripts/core/hero.gd` — Hero entity (movement, hex tracking, visual)
   - `scripts/core/game_camera.gd` — Hero-locked camera with smooth follow + zoom
   - `scripts/core/grid_visual.gd` — Updated: active hex indicator (amber highlight)
+
+## Phase 3 Details (Day/Night Cycle)
+- **State machine:** NIGHT ↔ DAY via DayNightManager autoload
+- **Game start:** Night 0 (safe, no enemies, cozy blue atmosphere)
+- **Night → Day:** Player presses Space ("Start Day"), transitions to Day N
+- **Day → Night:** Timer expires (30s placeholder) or `day_wave_cleared` signal, transitions to Night N
+- **Visual feedback:** CanvasModulate tween — night (cool blue 0.45, 0.50, 0.75) ↔ day (warm white 1.0, 0.98, 0.92), 1.5s cubic transition
+- **HUD:** Phase label (top-left), day progress bar, "Start Day" prompt (bottom-center), phase banner (center, fades after 1.5s)
+- **Hero night speed:** 1.5x movement multiplier during night for faster building traversal
+- **SignalBus:** Central signal hub autoload for cross-system communication
+- **Input:** `start_day` action mapped to Space key
+- **Files:**
+  - `autoload/signal_bus.gd` — Central signal bus (phase_changed, day_started, night_started, day_wave_cleared, start_day_requested)
+  - `autoload/day_night_manager.gd` — Phase state machine, day timer, transition logic
+  - `scripts/core/day_night_visual.gd` — CanvasModulate with tween transitions
+  - `scripts/ui/phase_hud.gd` — Phase UI display and input handling
+  - `scenes/ui/phase_hud.tscn` — HUD scene (labels, progress bar, banner)
+  - `scripts/core/hero.gd` — Updated: night speed multiplier via SignalBus

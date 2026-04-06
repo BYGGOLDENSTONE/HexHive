@@ -1,9 +1,11 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/hex_grid.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/core/grid_visual.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/core/game_camera.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/core/hero.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/core/day_night_visual.gd" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/ui/phase_hud.tscn" id="6"]
 
 [node name="Game" type="Node2D"]
 
@@ -23,3 +25,10 @@ script = ExtResource("4")
 [node name="GameCamera" type="Camera2D" parent="."]
 unique_name_in_owner = true
 script = ExtResource("3")
+
+[node name="DayNightVisual" type="CanvasModulate" parent="."]
+unique_name_in_owner = true
+color = Color(0.45, 0.5, 0.75, 1)
+script = ExtResource("5")
+
+[node name="PhaseHUD" parent="." instance=ExtResource("6")]

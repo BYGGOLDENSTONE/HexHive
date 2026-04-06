@@ -9,6 +9,12 @@ signal hex_changed(old_hex: Vector2i, new_hex: Vector2i)
 ## Movement speed in pixels per second.
 @export var move_speed: float = 200.0
 
+## Speed multiplier during night phase (hero moves faster at night for building).
+@export var night_speed_multiplier: float = 1.5
+
+## Active speed multiplier (updated by day/night signals).
+var _speed_multiplier: float = 1.5
+
 ## Visual scale relative to a slot hex (1.0 = same size as slot).
 @export var visual_scale: float = 1.1
 
@@ -26,6 +32,8 @@ func _ready() -> void:
 	var slot_size: float = hex_grid.slot_radius / sqrt(3.0)
 	_draw_size = slot_size * visual_scale
 	current_hex = HexHelper.pixel_to_hex(position, hex_grid.hex_size)
+
+	SignalBus.phase_changed.connect(_on_phase_changed)
 
 
 func _process(delta: float) -> void:
@@ -50,7 +58,7 @@ func _get_input_direction() -> Vector2:
 
 
 func _apply_movement(input_dir: Vector2, delta: float) -> void:
-	var move_vec := input_dir * move_speed * delta
+	var move_vec := input_dir * move_speed * _speed_multiplier * delta
 
 	# Try full movement
 	var desired := position + move_vec
@@ -108,3 +116,7 @@ func _draw() -> void:
 		off + Vector2(s * 0.6, s * 0.4),
 	])
 	draw_colored_polygon(tri, Color(1.0, 1.0, 1.0, 0.8))
+
+
+func _on_phase_changed(phase: StringName) -> void:
+	_speed_multiplier = night_speed_multiplier if phase == &"night" else 1.0
