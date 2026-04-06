@@ -15,7 +15,7 @@ var night_number: int = 0
 var day_number: int = 0
 
 ## Duration of a day phase in seconds (placeholder until real waves exist).
-@export var day_duration: float = 30.0
+@export var day_duration: float = 5.0
 
 ## Whether a phase transition is currently in progress.
 var _transitioning: bool = false

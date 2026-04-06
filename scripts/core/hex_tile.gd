@@ -23,6 +23,9 @@ var terrain: TerrainType = TerrainType.GRASS
 ## Whether a building occupies this tile
 var has_building: bool = false
 
+## Reference to the Building node on this tile (null if none).
+var building: Variant = null
+
 ## The 7 internal slot states (true = occupied, false = empty)
 var slot_occupied: Array[bool] = [false, false, false, false, false, false, false]
 
@@ -95,6 +98,10 @@ func clear_all_slots() -> void:
 		slot_entities[i] = null
 
 
-## Check if the tile is walkable (not mountain/water, no building).
+## Check if the tile is walkable (not mountain/water, not a wall building).
 func is_walkable() -> bool:
-	return terrain != TerrainType.MOUNTAIN and terrain != TerrainType.WATER
+	if terrain == TerrainType.MOUNTAIN or terrain == TerrainType.WATER:
+		return false
+	if building != null and building.data != null and building.data.blocks_walkability:
+		return false
+	return true

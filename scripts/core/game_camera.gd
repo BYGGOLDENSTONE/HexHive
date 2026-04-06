@@ -3,7 +3,7 @@ extends Camera2D
 ## Camera locked to the hero with smooth follow and zoom.
 
 ## Zoom limits
-@export var zoom_min: float = 0.3
+@export var zoom_min: float = 0.7
 @export var zoom_max: float = 3.0
 @export var zoom_step: float = 0.1
 

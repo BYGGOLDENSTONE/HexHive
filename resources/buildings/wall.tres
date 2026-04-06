@@ -1,0 +1,16 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/core/building_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"wall"
+display_name = "Wall"
+description = "Blocks enemy movement."
+tags = Array[StringName]([&"defense", &"barrier"])
+max_level = 3
+buildable_on = Array[int]([0])
+blocks_walkability = true
+player_buildable = true
+level_colors = Array[Color]([Color(0.65, 0.5, 0.25, 1), Color(0.7, 0.55, 0.2, 1), Color(0.75, 0.6, 0.15, 1)])
+level_accent_colors = Array[Color]([Color(0.45, 0.35, 0.15, 1), Color(0.5, 0.38, 0.12, 1), Color(0.55, 0.42, 0.1, 1)])

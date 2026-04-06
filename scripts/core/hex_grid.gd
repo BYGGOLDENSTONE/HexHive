@@ -85,3 +85,50 @@ func get_tiles_by_terrain(terrain: HexTile.TerrainType) -> Array[HexTile]:
 ## Get total tile count.
 func get_tile_count() -> int:
 	return tiles.size()
+
+
+## Place a building on a tile. Returns true if successful.
+func place_building(coord: Vector2i, building_node: Node2D) -> bool:
+	var tile := get_tile(coord)
+	if tile == null or tile.has_building:
+		return false
+	tile.has_building = true
+	tile.building = building_node
+	return true
+
+
+## Remove a building from a tile.
+func remove_building(coord: Vector2i) -> void:
+	var tile := get_tile(coord)
+	if tile:
+		tile.has_building = false
+		tile.building = null
+
+
+## Get the building on a tile (or null).
+func get_building_at(coord: Vector2i) -> Variant:
+	var tile := get_tile(coord)
+	if tile:
+		return tile.building
+	return null
+
+
+## Check if a tile can accept a specific building type.
+func can_place_building(coord: Vector2i, building_data: Resource) -> bool:
+	var tile := get_tile(coord)
+	if tile == null:
+		return false
+	if tile.has_building:
+		return false
+	if int(tile.terrain) not in building_data.buildable_on:
+		return false
+	return true
+
+
+## Get all tile coordinates that have buildings.
+func get_all_building_coords() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for coord: Vector2i in tiles:
+		if tiles[coord].has_building:
+			result.append(coord)
+	return result

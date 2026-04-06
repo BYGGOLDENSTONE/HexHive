@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/hex_grid.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/core/grid_visual.gd" id="2"]
@@ -6,6 +6,11 @@
 [ext_resource type="Script" path="res://scripts/core/hero.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/core/day_night_visual.gd" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/phase_hud.tscn" id="6"]
+[ext_resource type="Script" path="res://scripts/core/build_manager.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/core/build_ghost.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/core/building_proximity.gd" id="9"]
+[ext_resource type="PackedScene" path="res://scenes/ui/build_menu.tscn" id="10"]
+[ext_resource type="PackedScene" path="res://scenes/ui/upgrade_popup.tscn" id="11"]
 
 [node name="Game" type="Node2D"]
 
@@ -18,9 +23,23 @@ map_radius = 20
 [node name="GridVisual" type="Node2D" parent="."]
 script = ExtResource("2")
 
+[node name="Buildings" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="BuildGhost" type="Node2D" parent="."]
+unique_name_in_owner = true
+script = ExtResource("8")
+
 [node name="Hero" type="Node2D" parent="."]
 unique_name_in_owner = true
 script = ExtResource("4")
+
+[node name="BuildManager" type="Node2D" parent="."]
+unique_name_in_owner = true
+script = ExtResource("7")
+
+[node name="BuildingProximity" type="Node" parent="."]
+script = ExtResource("9")
 
 [node name="GameCamera" type="Camera2D" parent="."]
 unique_name_in_owner = true
@@ -32,3 +51,7 @@ color = Color(0.45, 0.5, 0.75, 1)
 script = ExtResource("5")
 
 [node name="PhaseHUD" parent="." instance=ExtResource("6")]
+
+[node name="BuildMenu" parent="." instance=ExtResource("10")]
+
+[node name="UpgradePopup" parent="." instance=ExtResource("11")]

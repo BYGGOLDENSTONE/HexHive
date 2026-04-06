@@ -20,20 +20,11 @@ extends Node2D
 ## Color of the hover outline
 @export var hover_outline_color: Color = Color(1.0, 0.85, 0.3, 0.8)
 
-## Color for inner slot outlines (debug)
-@export var slot_outline_color: Color = Color(0.6, 0.85, 1.0, 0.5)
-
 ## Fill color for the hero's active hex
 @export var active_hex_fill_color: Color = Color(1.0, 0.7, 0.2, 0.15)
 
 ## Outline color for the hero's active hex
 @export var active_hex_outline_color: Color = Color(1.0, 0.7, 0.2, 0.5)
-
-## Size of inner flat-top slot hexes (computed for perfect fit)
-var slot_visual_size: float
-
-## Whether to show inner slots on hover
-@export var show_slots_on_hover: bool = true
 
 ## Whether to show coordinate labels
 @export var show_coords: bool = true
@@ -44,8 +35,6 @@ var slot_visual_size: float
 ## Currently hovered hex coordinate (null if none)
 var _hovered_coord: Variant = null
 
-## Whether slots are being shown (after click)
-var _show_slots_coord: Variant = null
 
 ## Reference to the hero for active hex tracking
 var _hero: Node2D = null
@@ -59,7 +48,6 @@ var _visible_rect: Rect2 = Rect2()
 
 func _ready() -> void:
 	z_index = -1
-	slot_visual_size = hex_grid.slot_radius / sqrt(3.0)
 	_hero = %Hero
 
 
@@ -100,11 +88,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _hovered_coord != null:
 				var coord: Vector2i = _hovered_coord as Vector2i
 				hex_grid.tile_clicked.emit(coord)
-				# Toggle slot display on click
-				if _show_slots_coord == coord:
-					_show_slots_coord = null
-				else:
-					_show_slots_coord = coord
 
 
 func _draw() -> void:
@@ -124,6 +107,14 @@ func _draw() -> void:
 
 		var corners: PackedVector2Array = HexHelper.get_hex_corners(center, hex_size)
 		_draw_hex_outline(corners, outline_color, outline_width)
+
+	# Draw building-occupied tiles with amber outline
+	for coord: Vector2i in hex_grid.tiles:
+		var tile: HexTile = hex_grid.tiles[coord]
+		if tile.has_building and _visible_rect.has_point(tile.pixel_center):
+			var b_corners: PackedVector2Array = HexHelper.get_hex_corners(tile.pixel_center, hex_size)
+			draw_colored_polygon(b_corners, Color(0.9, 0.7, 0.2, 0.08))
+			_draw_hex_outline(b_corners, Color(0.9, 0.6, 0.2, 0.5), 2.0)
 
 	# Draw hero's active hex
 	if _hero:
@@ -150,23 +141,6 @@ func _draw() -> void:
 				var label_text: String = "%d, %d" % [coord.x, coord.y]
 				_draw_coord_label(tile.pixel_center, label_text)
 
-	# Draw inner slots
-	var slots_coord: Variant = _show_slots_coord if _show_slots_coord != null else (_hovered_coord if show_slots_on_hover else null)
-	if slots_coord != null:
-		var coord: Vector2i = slots_coord as Vector2i
-		var slot_positions: Array[Vector2] = hex_grid.get_tile_slot_positions(coord)
-		for i in range(slot_positions.size()):
-			var slot_center: Vector2 = slot_positions[i]
-			var slot_corners: PackedVector2Array = HexHelper.get_flat_hex_corners(slot_center, slot_visual_size)
-			# Center slot slightly different color
-			var color: Color = slot_outline_color
-			if i == 0:
-				color = Color(1.0, 0.9, 0.4, 0.6)
-			_draw_hex_outline(slot_corners, color, 1.5)
-			# Slot fill
-			var fill_color: Color = color
-			fill_color.a = 0.1
-			draw_colored_polygon(slot_corners, fill_color)
 
 
 ## Draw a hex outline from corner points.

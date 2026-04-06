@@ -78,7 +78,7 @@ res://
 | 1 | **Hex Grid** | Dual grid system, coordinate math, visual debug overlay | **Done** |
 | 2 | **Hero + Camera** | WASD movement on grid, hero-locked camera with zoom | **Done** |
 | 3 | **Day/Night Cycle** | State machine: Night → Day → Night, manual day trigger | **Done** |
-| 4 | **Building Placement** | Hero walks to hex, place/upgrade buildings at night | Pending |
+| 4 | **Building Placement** | Hero walks to hex, place/upgrade buildings at night | **Done** |
 | 5 | **Combat Basics** | Enemy spawning, hero auto-attack, basic enemy AI | Pending |
 | 6 | **Economy (Honey)** | Enemy drops, flower collection, spending on buildings | Pending |
 
@@ -86,9 +86,9 @@ res://
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** Phase 3 complete, ready for Phase 4
-- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid), Phase 2 (Hero + Camera), Phase 3 (Day/Night Cycle)
-- **Next:** Phase 4 — Building Placement (hero walks to hex, place/upgrade buildings at night)
+- **Phase:** Phase 4 complete, ready for Phase 5
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid), Phase 2 (Hero + Camera), Phase 3 (Day/Night Cycle), Phase 4 (Building Placement)
+- **Next:** Phase 5 — Combat Basics (enemy spawning, hero auto-attack, basic enemy AI)
 
 ## Phase 1 Details (Hex Grid)
 - **Grid type:** Pointy-top hex grid (axial coordinates q, r)
@@ -133,3 +133,37 @@ res://
   - `scripts/ui/phase_hud.gd` — Phase UI display and input handling
   - `scenes/ui/phase_hud.tscn` — HUD scene (labels, progress bar, banner)
   - `scripts/core/hero.gd` — Updated: night speed multiplier via SignalBus
+
+## Phase 4 Details (Building Placement)
+- **Build flow:** Night starts → Build Menu auto-opens → player selects building → ghost preview follows mouse (green=valid, red=invalid) → click to place → hero auto-walks within 1 hex range → building placed with animation → stays in build mode for multi-placement
+- **Buildings:** Honey Turret (defense), Wall (blocks movement), Flower Garden (economy), Hive (pre-placed base at center)
+- **All buildings block movement** — hero cannot walk through any building
+- **Economy:** Free (no cost system yet — added in Phase 6)
+- **Upgrade:** Walk within 1 hex of existing building → popup appears on opposite side from hero → click "Upgrade" → level 1→2→3 with visual changes and stat display
+- **Upgrade popup features:** Stat display per building type (damage/range/speed/HP/armor/income), connector line from popup to building, directional placement away from hero, overlap resolution (min 35° spread), auto-hide when zoomed out
+- **Day duration:** Changed from 30s to 5s (no enemies yet)
+- **Build data:** Resource-based system (`building_data.gd`) with `.tres` files per building type in `resources/buildings/`
+- **State machine:** BuildManager with states IDLE→PREVIEWING→WALKING_TO_BUILD→BUILDING
+- **Hero auto-walk:** Straight-line movement toward build target, WASD cancels, stuck detection (3s timeout)
+- **Hero spawn:** Starts at hex (1,0) next to the Hive
+- **Night-only:** Build menu auto-hides on day start, all build operations cancelled
+- **Camera:** Max zoom out changed to 0.7x
+- **Input:** `cancel_build` = ESC, `quick_build_1/2/3` = 1/2/3 keys
+- **Removed:** Inner slot debug visualization from grid (Phase 1 debug feature)
+- **Files:**
+  - `scripts/core/building_data.gd` — Building type Resource definition (id, tags, max_level, colors, buildable_on, blocks_walkability)
+  - `resources/buildings/*.tres` — 4 building definitions (honey_turret, wall, flower_garden, hive)
+  - `autoload/building_registry.gd` — Autoload that loads all building data, provides lookup by id
+  - `scripts/core/building.gd` — Runtime building entity (Node2D, procedural _draw, level system, placement/upgrade animations)
+  - `scenes/buildings/building.tscn` — Building scene
+  - `scripts/core/build_manager.gd` — Central build state machine, coordinates placement flow, places starting Hive
+  - `scripts/core/build_ghost.gd` — Ghost preview renderer (mouse tracking, hex snapping, green/red validity)
+  - `scripts/core/building_proximity.gd` — Detects hero within 2 hex of buildings, emits signals
+  - `scripts/ui/build_menu.gd` + `scenes/ui/build_menu.tscn` — Build menu UI (auto-opens at night, 1-2-3 shortcuts)
+  - `scripts/ui/upgrade_popup.gd` + `scenes/ui/upgrade_popup.tscn` — Upgrade popup above buildings
+  - `autoload/signal_bus.gd` — Updated: ~15 building-related signals added
+  - `scripts/core/hex_grid.gd` — Updated: place_building, remove_building, can_place_building, get_building_at
+  - `scripts/core/hex_tile.gd` — Updated: building reference field, wall walkability check
+  - `scripts/core/hero.gd` — Updated: auto-walk system (build_walk_requested → walk → hero_reached_build_range)
+  - `scripts/core/grid_visual.gd` — Updated: building-occupied hex outline highlight
+  - `autoload/day_night_manager.gd` — Updated: day_duration 30s → 5s
