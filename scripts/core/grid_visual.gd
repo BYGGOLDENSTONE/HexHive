@@ -23,6 +23,12 @@ extends Node2D
 ## Color for inner slot outlines (debug)
 @export var slot_outline_color: Color = Color(0.6, 0.85, 1.0, 0.5)
 
+## Fill color for the hero's active hex
+@export var active_hex_fill_color: Color = Color(1.0, 0.7, 0.2, 0.15)
+
+## Outline color for the hero's active hex
+@export var active_hex_outline_color: Color = Color(1.0, 0.7, 0.2, 0.5)
+
 ## Size of inner flat-top slot hexes (computed for perfect fit)
 var slot_visual_size: float
 
@@ -41,6 +47,9 @@ var _hovered_coord: Variant = null
 ## Whether slots are being shown (after click)
 var _show_slots_coord: Variant = null
 
+## Reference to the hero for active hex tracking
+var _hero: Node2D = null
+
 ## Camera reference for culling
 var _camera: Camera2D = null
 
@@ -51,6 +60,7 @@ var _visible_rect: Rect2 = Rect2()
 func _ready() -> void:
 	z_index = -1
 	slot_visual_size = hex_grid.slot_radius / sqrt(3.0)
+	_hero = %Hero
 
 
 func _process(_delta: float) -> void:
@@ -114,6 +124,15 @@ func _draw() -> void:
 
 		var corners: PackedVector2Array = HexHelper.get_hex_corners(center, hex_size)
 		_draw_hex_outline(corners, outline_color, outline_width)
+
+	# Draw hero's active hex
+	if _hero:
+		var active_coord: Vector2i = _hero.get("current_hex")
+		var active_tile: HexTile = hex_grid.get_tile(active_coord)
+		if active_tile:
+			var active_corners: PackedVector2Array = HexHelper.get_hex_corners(active_tile.pixel_center, hex_size)
+			draw_colored_polygon(active_corners, active_hex_fill_color)
+			_draw_hex_outline(active_corners, active_hex_outline_color, 2.0)
 
 	# Draw hover highlight
 	if _hovered_coord != null:

@@ -76,7 +76,7 @@ res://
 | Phase | System | Description | Status |
 |-------|--------|-------------|--------|
 | 1 | **Hex Grid** | Dual grid system, coordinate math, visual debug overlay | **Done** |
-| 2 | **Hero + Camera** | WASD movement on grid, hero-locked camera with zoom | Pending |
+| 2 | **Hero + Camera** | WASD movement on grid, hero-locked camera with zoom | **Done** |
 | 3 | **Day/Night Cycle** | State machine: Night → Day → Night, manual day trigger | Pending |
 | 4 | **Building Placement** | Hero walks to hex, place/upgrade buildings at night | Pending |
 | 5 | **Combat Basics** | Enemy spawning, hero auto-attack, basic enemy AI | Pending |
@@ -86,9 +86,9 @@ res://
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** Phase 1 complete, ready for Phase 2
-- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid)
-- **Next:** Phase 2 — Hero + Camera (WASD movement on grid, hero-locked camera)
+- **Phase:** Phase 2 complete, ready for Phase 3
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid), Phase 2 (Hero + Camera)
+- **Next:** Phase 3 — Day/Night Cycle (state machine, manual day trigger)
 
 ## Phase 1 Details (Hex Grid)
 - **Grid type:** Pointy-top hex grid (axial coordinates q, r)
@@ -96,11 +96,22 @@ res://
 - **Inner slots:** Flat-top hexes arranged as rosette — naturally forms pointy-top silhouette from outside
 - **Perfect fit math:** slot_radius = hex_size * 3/5, slot_size = slot_radius / sqrt(3)
 - **Map size:** ~40 hex diameter (map_radius = 20)
-- **Hero:** Occupies 1 large tile (not a slot)
 - **Files:**
   - `scripts/core/hex_helper.gd` — Static hex math (coord conversion, neighbors, distance, line, geometry)
   - `scripts/core/hex_tile.gd` — Tile data (terrain, 7 slot states, occupancy)
   - `scripts/core/hex_grid.gd` — Grid manager (tile storage, queries, world↔hex conversion)
-  - `scripts/core/grid_visual.gd` — Debug rendering (outlines, hover, slot display)
-  - `scripts/core/game_camera.gd` — Pan (WASD/arrows/middle-drag) + smooth zoom
-  - `scenes/main/game.tscn` — Main scene (HexGrid + GridVisual + GameCamera)
+  - `scripts/core/grid_visual.gd` — Debug rendering (outlines, hover, slot display, active hex)
+  - `scenes/main/game.tscn` — Main scene
+
+## Phase 2 Details (Hero + Camera)
+- **Hero:** Small hex-sized entity (slot scale 1.1x), free WASD/arrow movement (not grid-snapped)
+- **Hex tracking:** System always knows hero's nearest large tile via `pixel_to_hex` — used for range/aura calculations
+- **Ranges in hex tiles:** All ranges (attack, aura, towers) measured in large hex tile distance for strategic clarity
+- **Grid blocking:** Non-walkable hexes (mountain/water/out-of-bounds) blocked via coordinate check, no physics
+- **Wall sliding:** Diagonal movement against walls slides along the wall instead of stopping
+- **Camera:** Locked to hero with smooth follow (lerp), zoom only (no free pan)
+- **Input actions:** `move_left/right/up/down` — WASD + arrow keys
+- **Files:**
+  - `scripts/core/hero.gd` — Hero entity (movement, hex tracking, visual)
+  - `scripts/core/game_camera.gd` — Hero-locked camera with smooth follow + zoom
+  - `scripts/core/grid_visual.gd` — Updated: active hex indicator (amber highlight)
