@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 SignalBus="*res://autoload/signal_bus.gd"
 DayNightManager="*res://autoload/day_night_manager.gd"
 BuildingRegistry="*res://autoload/building_registry.gd"
+EnemyRegistry="*res://autoload/enemy_registry.gd"
 
 [input]
 

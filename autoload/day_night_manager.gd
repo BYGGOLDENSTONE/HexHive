@@ -14,24 +14,20 @@ var night_number: int = 0
 ## Current day number (starts at 1 on first day).
 var day_number: int = 0
 
-## Duration of a day phase in seconds (placeholder until real waves exist).
-@export var day_duration: float = 5.0
-
 ## Whether a phase transition is currently in progress.
 var _transitioning: bool = false
 
-## Timer for day phase duration.
-var _day_timer: Timer
+## Live wave state — populated by SignalBus wave signals.
+var _wave_total: int = 0
+var _wave_remaining: int = 0
 
 
 func _ready() -> void:
-	_day_timer = Timer.new()
-	_day_timer.one_shot = true
-	_day_timer.timeout.connect(_on_day_timer_timeout)
-	add_child(_day_timer)
-
 	SignalBus.start_day_requested.connect(_on_start_day_requested)
 	SignalBus.day_wave_cleared.connect(_on_day_wave_cleared)
+	SignalBus.wave_started.connect(_on_wave_started)
+	SignalBus.wave_progress_changed.connect(_on_wave_progress_changed)
+	SignalBus.restart_requested.connect(_on_restart_requested)
 
 	# Start at Night 0
 	_enter_night()
@@ -49,10 +45,24 @@ func _on_day_wave_cleared() -> void:
 	_transition_to_night()
 
 
-func _on_day_timer_timeout() -> void:
-	# Day timer expired — treat as wave cleared (placeholder until combat exists)
-	if current_phase == Phase.DAY and not _transitioning:
-		_transition_to_night()
+func _on_wave_started(_day: int, total: int) -> void:
+	_wave_total = total
+	_wave_remaining = total
+
+
+func _on_wave_progress_changed(remaining: int, total: int) -> void:
+	_wave_remaining = remaining
+	_wave_total = total
+
+
+func _on_restart_requested() -> void:
+	# Reset state for a fresh run.
+	day_number = 0
+	night_number = 0
+	_wave_total = 0
+	_wave_remaining = 0
+	_transitioning = false
+	_enter_night()
 
 
 func _transition_to_day() -> void:
@@ -63,17 +73,15 @@ func _transition_to_day() -> void:
 	SignalBus.phase_changed.emit(&"day")
 	SignalBus.day_started.emit(day_number)
 
-	# Start day timer (placeholder — will be replaced by wave system)
-	_day_timer.start(day_duration)
-
 	_transitioning = false
 
 
 func _transition_to_night() -> void:
 	_transitioning = true
-	_day_timer.stop()
 	night_number += 1
 	current_phase = Phase.NIGHT
+	_wave_total = 0
+	_wave_remaining = 0
 
 	SignalBus.phase_changed.emit(&"night")
 	SignalBus.night_started.emit(night_number)
@@ -87,18 +95,22 @@ func _enter_night() -> void:
 	SignalBus.night_started.emit(night_number)
 
 
-## Returns time remaining in current day, or 0.0 if night.
-func get_day_time_remaining() -> float:
-	if current_phase == Phase.DAY and not _day_timer.is_stopped():
-		return _day_timer.time_left
-	return 0.0
-
-
-## Returns progress of current day (0.0 to 1.0), or 0.0 if night.
+## Returns wave progress as 0-1 fraction (defeated / total). 0 if no wave active.
 func get_day_progress() -> float:
-	if current_phase == Phase.DAY and not _day_timer.is_stopped():
-		return 1.0 - (_day_timer.time_left / day_duration)
-	return 0.0
+	if current_phase != Phase.DAY or _wave_total <= 0:
+		return 0.0
+	var defeated: int = _wave_total - _wave_remaining
+	return clampf(float(defeated) / float(_wave_total), 0.0, 1.0)
+
+
+## Returns the current wave's remaining enemy count (alive + queued).
+func get_wave_remaining() -> int:
+	return _wave_remaining
+
+
+## Returns the current wave's total enemy count.
+func get_wave_total() -> int:
+	return _wave_total
 
 
 ## Returns true if currently in night phase.

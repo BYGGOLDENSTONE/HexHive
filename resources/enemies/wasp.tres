@@ -1,0 +1,20 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/combat/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"wasp"
+display_name = "Wasp"
+tags = Array[StringName]([&"melee", &"swarm", &"fast"])
+max_hp = 30.0
+move_speed = 95.0
+attack_damage = 5.0
+attack_speed = 1.5
+attack_range = 38.0
+spawn_delay = 0.25
+visual_size = 16.0
+body_color = Color(0.95, 0.82, 0.18, 1)
+accent_color = Color(0.1, 0.08, 0.04, 1)
+wing_color = Color(0.95, 0.95, 1.0, 0.55)
+eye_color = Color(1.0, 0.3, 0.15, 1)

@@ -79,16 +79,23 @@ res://
 | 2 | **Hero + Camera** | WASD movement on grid, hero-locked camera with zoom | **Done** |
 | 3 | **Day/Night Cycle** | State machine: Night → Day → Night, manual day trigger | **Done** |
 | 4 | **Building Placement** | Hero walks to hex, place/upgrade buildings at night | **Done** |
-| 5 | **Combat Basics** | Enemy spawning, hero auto-attack, basic enemy AI | Pending |
+| 5 | **Combat Basics** | Enemy spawning, hero auto-attack, basic enemy AI | **Done** |
 | 6 | **Economy (Honey)** | Enemy drops, flower collection, spending on buildings | Pending |
 
 > After Phase 6: core loop is playable (build → defend → earn → repeat).
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** Phase 4 complete, ready for Phase 5
-- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid), Phase 2 (Hero + Camera), Phase 3 (Day/Night Cycle), Phase 4 (Building Placement)
-- **Next:** Phase 5 — Combat Basics (enemy spawning, hero auto-attack, basic enemy AI)
+- **Phase:** Phase 5 complete, ready for Phase 6
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1 (Hex Grid), Phase 2 (Hero + Camera), Phase 3 (Day/Night Cycle), Phase 4 (Building Placement), Phase 5 (Combat Basics)
+- **Next:** Phase 6 — Economy (Honey) (enemy drops, flower garden production, building costs)
+
+## Known Issues / Backlog
+> Tracked bugs and improvements to address before/during the next phase.
+
+1. **Hero gets stuck on existing buildings during multi-place auto-walk** — when placing buildings back-to-back, the straight-line auto-walk runs into a previously placed building and can't reach the new target. Needs proper hex-grid pathfinding (A*) for the hero auto-walk (`hero.gd::_process_auto_walk`).
+2. **Player can build on the hero's hex** — placing a building on the hero's current tile traps the hero permanently inside a non-walkable cell. `hex_grid.can_place_building` should reject the hero's current hex (and possibly any unit-occupied hex), or build flow should refuse if hero is on the target.
+3. **Day 1 starting wave too punishing** — 5 wasps from 5 directions is too much before the player has any defenses. Reduce Day 1 to ~2-3 wasps (or scale starting count down) in `wave_manager.gd::_build_wave_composition`.
 
 ## Phase 1 Details (Hex Grid)
 - **Grid type:** Pointy-top hex grid (axial coordinates q, r)
@@ -167,3 +174,37 @@ res://
   - `scripts/core/hero.gd` — Updated: auto-walk system (build_walk_requested → walk → hero_reached_build_range)
   - `scripts/core/grid_visual.gd` — Updated: building-occupied hex outline highlight
   - `autoload/day_night_manager.gd` — Updated: day_duration 30s → 5s
+
+## Phase 5 Details (Combat Basics)
+- **Enemy roster:** Wasp (fast/swarm, 30 HP, 5 dmg) + Hornet (tank, 100 HP, 15 dmg). Resource-based system (`enemy_data.gd`).
+- **Wave system:** Day-scaled composition (Day 1: 5 wasps; Day 2: 8 wasps + 1 hornet; +2 wasps + 1 hornet per day). Random outer-ring spawn with 0.45s stagger. Wave-cleared signal triggers night transition (no more timer fallback).
+- **Enemy AI (Throne Fall style):** Primary target = Hive. Each 0.35s retarget: (1) opportunity threats (hero) within 1 hex range, (2) first building blocking the line to Hive, (3) Hive itself. Walls in path get attacked and destroyed; enemies then continue to Hive.
+- **Hero combat:** Auto-attack nearest enemy in 165px (~2 hex) range. 15 damage, 1.5/s, honey-drop projectiles with light homing. HP 100, dies on 0, 3s respawn at Hive with full HP.
+- **Honey Turret combat:** Auto-shoots nearest enemy. Per-level stats (L1: 10 dmg/165px/1.0/s → L3: 22 dmg/220px/1.7/s). HP 60→130 per level.
+- **Wall combat:** HP 80→220 per level. Crack visuals at 66% and 33% HP. Blocks movement until destroyed.
+- **Hive:** 500 HP. Pulses red below 50%. Destruction triggers Game Over screen with restart button.
+- **Death/respawn:** Hero stuns 3s then respawns at Hive (full HP). Buildings (except Hive) queue_free on death. Enemies fade out with rotation.
+- **UI:** Top-center Hive HP bar (always visible, pulses on low HP). Per-entity HP bars when damaged. Phase HUD shows "Day X — N left". Game Over fullscreen overlay with Restart button.
+- **Visual juice (no-shake compliance):** Damage flash overlay (red wash 0.18s), spawn pop-in tween, projectile glow trails, death scale-up + rotation + fade.
+- **Files (new):**
+  - `scripts/combat/health.gd` — Reusable Health component (max_hp, take_damage, heal, signals)
+  - `scripts/combat/enemy_data.gd` — Enemy type Resource definition
+  - `resources/enemies/wasp.tres`, `hornet.tres` — Enemy data
+  - `autoload/enemy_registry.gd` — Loads enemy data, lookup by id
+  - `scripts/combat/enemy.gd` — Runtime enemy entity (movement, AI, attack, procedural humanoid bee draw, wing animation)
+  - `scenes/entities/enemy.tscn`
+  - `scripts/combat/projectile.gd` — Honey-drop projectile with homing, glow trail, impact effect
+  - `scenes/combat/projectile.tscn`
+  - `scripts/combat/wave_manager.gd` — Spawn coordinator, day-scaled composition, alive tracking, clear detection
+  - `scripts/ui/hive_hp_bar.gd` + `scenes/ui/hive_hp_bar.tscn` — Top-center Hive HP HUD with low-HP pulse
+  - `scripts/ui/game_over_screen.gd` + `scenes/ui/game_over_screen.tscn` — Full-screen overlay with Restart
+- **Files (updated):**
+  - `autoload/signal_bus.gd` — ~13 combat signals added (enemy/hero/hive/wave/game_over/restart)
+  - `autoload/day_night_manager.gd` — Removed day timer, now wave-cleared triggers night, added wave_total/wave_remaining state, restart handling
+  - `scripts/core/building_data.gd` — Added per-level combat stats (max_hp, attack_damage, attack_range, attack_speed) + helper getters
+  - `resources/buildings/*.tres` — All 4 buildings now have HP and combat stats per level
+  - `scripts/core/building.gd` — Health component, take_damage, turret auto-fire, wall crack visuals, hive pulse warning, death animation, destroy signal
+  - `scripts/core/hero.gd` — Health component, auto-attack with projectiles, damage flash, death/respawn cycle, restart support, "hero" group
+  - `scripts/ui/phase_hud.gd` — Wave progress text instead of seconds
+  - `scenes/main/game.tscn` — Added Enemies/Projectiles containers, WaveManager, HiveHpBar, GameOverScreen
+  - `project.godot` — EnemyRegistry autoload

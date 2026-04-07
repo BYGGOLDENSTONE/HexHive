@@ -30,8 +30,8 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if DayNightManager.is_day():
 		day_progress.value = DayNightManager.get_day_progress() * 100.0
-		var remaining: float = DayNightManager.get_day_time_remaining()
-		phase_label.text = "Day %d  —  %ds" % [DayNightManager.day_number, ceili(remaining)]
+		var remaining: int = DayNightManager.get_wave_remaining()
+		phase_label.text = "Day %d  —  %d left" % [DayNightManager.day_number, remaining]
 
 
 func _unhandled_input(event: InputEvent) -> void:

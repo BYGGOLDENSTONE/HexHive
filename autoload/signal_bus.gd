@@ -56,3 +56,55 @@ signal hero_left_building()
 
 ## Upgrade requested for building at coord.
 signal upgrade_requested(coord: Vector2i)
+
+# -- Combat: Enemies --
+
+## Emitted when an enemy spawns. enemy is the runtime Node2D.
+signal enemy_spawned(enemy: Node2D)
+
+## Emitted when an enemy dies. enemy is the runtime Node2D (still in tree this frame).
+signal enemy_died(enemy: Node2D)
+
+## Emitted when an enemy takes damage. amount > 0.
+signal enemy_damaged(enemy: Node2D, amount: float)
+
+# -- Combat: Hero --
+
+## Emitted when the hero takes damage.
+signal hero_damaged(amount: float, current_hp: float, max_hp: float)
+
+## Emitted when the hero's HP reaches zero.
+signal hero_died()
+
+## Emitted when the hero respawns at the Hive.
+signal hero_respawned()
+
+# -- Combat: Hive & Buildings --
+
+## Emitted when the Hive takes damage.
+signal hive_damaged(amount: float, current_hp: float, max_hp: float)
+
+## Emitted when the Hive HP reaches zero (game over trigger).
+signal hive_destroyed()
+
+## Emitted when any building takes damage.
+signal building_damaged(building_node: Node2D, amount: float)
+
+## Emitted when a non-Hive building is destroyed by enemies.
+signal building_destroyed(building_node: Node2D, coord: Vector2i)
+
+# -- Combat: Waves --
+
+## Emitted when a new wave begins. total_enemies is the planned spawn count.
+signal wave_started(day_number: int, total_enemies: int)
+
+## Emitted whenever the alive enemy count changes during a wave.
+signal wave_progress_changed(alive: int, total: int)
+
+# -- Combat: Game State --
+
+## Emitted when the game ends (Hive destroyed).
+signal game_over(final_day: int)
+
+## Emitted when the player requests a restart from the game over screen.
+signal restart_requested()

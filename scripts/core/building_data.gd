@@ -32,3 +32,60 @@ extends Resource
 
 ## Accent color for procedural rendering (per level).
 @export var level_accent_colors: Array[Color] = []
+
+# -- Combat stats (per level) --
+
+## Max HP per upgrade level (length should match max_level).
+@export var max_hp_per_level: Array[float] = [100.0]
+
+## Damage per attack per level (0 = does not attack).
+@export var attack_damage_per_level: Array[float] = [0.0]
+
+## Attack range in pixels per level.
+@export var attack_range_per_level: Array[float] = [0.0]
+
+## Attacks per second per level.
+@export var attack_speed_per_level: Array[float] = [0.0]
+
+## True if this building can be destroyed (false for invulnerable special buildings, currently unused).
+@export var destructible: bool = true
+
+
+## Get max HP for a given level (1-indexed, clamped to data length).
+func get_max_hp(level: int) -> float:
+	var idx: int = clampi(level - 1, 0, max_hp_per_level.size() - 1)
+	if max_hp_per_level.is_empty():
+		return 100.0
+	return max_hp_per_level[idx]
+
+
+## Get attack damage for a level. Returns 0 if this building doesn't attack.
+func get_attack_damage(level: int) -> float:
+	if attack_damage_per_level.is_empty():
+		return 0.0
+	var idx: int = clampi(level - 1, 0, attack_damage_per_level.size() - 1)
+	return attack_damage_per_level[idx]
+
+
+## Get attack range (pixels) for a level.
+func get_attack_range(level: int) -> float:
+	if attack_range_per_level.is_empty():
+		return 0.0
+	var idx: int = clampi(level - 1, 0, attack_range_per_level.size() - 1)
+	return attack_range_per_level[idx]
+
+
+## Get attacks-per-second for a level.
+func get_attack_speed(level: int) -> float:
+	if attack_speed_per_level.is_empty():
+		return 0.0
+	var idx: int = clampi(level - 1, 0, attack_speed_per_level.size() - 1)
+	return attack_speed_per_level[idx]
+
+
+## Returns true if this building has any offensive capability.
+func is_offensive() -> bool:
+	for d in attack_damage_per_level:
+		if d > 0.0:
+			return true
+	return false

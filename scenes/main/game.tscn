@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/core/hex_grid.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/core/grid_visual.gd" id="2"]
@@ -11,6 +11,9 @@
 [ext_resource type="Script" path="res://scripts/core/building_proximity.gd" id="9"]
 [ext_resource type="PackedScene" path="res://scenes/ui/build_menu.tscn" id="10"]
 [ext_resource type="PackedScene" path="res://scenes/ui/upgrade_popup.tscn" id="11"]
+[ext_resource type="Script" path="res://scripts/combat/wave_manager.gd" id="12"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hive_hp_bar.tscn" id="13"]
+[ext_resource type="PackedScene" path="res://scenes/ui/game_over_screen.tscn" id="14"]
 
 [node name="Game" type="Node2D"]
 
@@ -26,6 +29,12 @@ script = ExtResource("2")
 [node name="Buildings" type="Node2D" parent="."]
 unique_name_in_owner = true
 
+[node name="Enemies" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="Projectiles" type="Node2D" parent="."]
+unique_name_in_owner = true
+
 [node name="BuildGhost" type="Node2D" parent="."]
 unique_name_in_owner = true
 script = ExtResource("8")
@@ -37,6 +46,10 @@ script = ExtResource("4")
 [node name="BuildManager" type="Node2D" parent="."]
 unique_name_in_owner = true
 script = ExtResource("7")
+
+[node name="WaveManager" type="Node2D" parent="."]
+unique_name_in_owner = true
+script = ExtResource("12")
 
 [node name="BuildingProximity" type="Node" parent="."]
 script = ExtResource("9")
@@ -52,6 +65,10 @@ script = ExtResource("5")
 
 [node name="PhaseHUD" parent="." instance=ExtResource("6")]
 
+[node name="HiveHpBar" parent="." instance=ExtResource("13")]
+
 [node name="BuildMenu" parent="." instance=ExtResource("10")]
 
 [node name="UpgradePopup" parent="." instance=ExtResource("11")]
+
+[node name="GameOverScreen" parent="." instance=ExtResource("14")]
