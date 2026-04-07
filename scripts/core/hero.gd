@@ -48,9 +48,6 @@ var current_hex: Vector2i = Vector2i.ZERO
 ## Cached visual size for drawing.
 var _draw_size: float = 0.0
 
-## Auto-walk target world position (null when not auto-walking).
-var _auto_walk_target_pos: Variant = null  # Vector2 or null
-
 ## Auto-walk target hex coordinate.
 var _auto_walk_target_hex: Variant = null  # Vector2i or null
 
@@ -59,6 +56,12 @@ var _auto_walk_range: int = 1
 
 ## Whether hero is currently auto-walking.
 var is_auto_walking: bool = false
+
+## Current path being followed (Array[Vector2i]). Empty when no path.
+var _auto_walk_path: Array[Vector2i] = []
+
+## Index of the next hex in `_auto_walk_path` to walk toward.
+var _auto_walk_path_index: int = 0
 
 ## Stuck detection: time since last hex change during auto-walk.
 var _auto_walk_stuck_time: float = 0.0
@@ -368,33 +371,69 @@ func _on_build_walk_requested(target_coord: Vector2i) -> void:
 		SignalBus.hero_reached_build_range.emit(target_coord)
 		return
 	_auto_walk_target_hex = target_coord
-	_auto_walk_target_pos = HexHelper.axial_to_pixel(target_coord, hex_grid.hex_size)
 	is_auto_walking = true
 	_auto_walk_stuck_time = 0.0
+	if not _recompute_auto_walk_path():
+		_cancel_auto_walk()
+
+
+## Computes a fresh A* path from the hero's current hex toward the build
+## target. The target hex itself is unwalkable (it will hold a building), so the
+## search succeeds when the hero reaches any walkable hex within
+## `_auto_walk_range` of the target. Returns true if a usable path was found.
+func _recompute_auto_walk_path() -> bool:
+	if _auto_walk_target_hex == null:
+		return false
+	var target_hex: Vector2i = _auto_walk_target_hex as Vector2i
+	var path: Array[Vector2i] = hex_grid.find_path(current_hex, target_hex, _auto_walk_range)
+	if path.is_empty():
+		return false
+	_auto_walk_path = path
+	# path[0] is the current hex; advance to the next hex.
+	_auto_walk_path_index = 1 if path.size() > 1 else 0
+	return true
 
 
 func _process_auto_walk(delta: float) -> void:
-	if _auto_walk_target_hex == null or _auto_walk_target_pos == null:
+	if _auto_walk_target_hex == null:
 		_cancel_auto_walk()
 		return
 
 	var target_hex: Vector2i = _auto_walk_target_hex as Vector2i
-	var target_pos: Vector2 = _auto_walk_target_pos as Vector2
 
-	# Check if already in range
+	# Already in range — done.
 	if HexHelper.distance(current_hex, target_hex) <= _auto_walk_range:
 		_finish_auto_walk()
 		return
 
-	# Move toward target
-	var dir: Vector2 = (target_pos - position).normalized()
+	# If we have no usable path step, try to recompute.
+	if _auto_walk_path.is_empty() or _auto_walk_path_index >= _auto_walk_path.size():
+		if not _recompute_auto_walk_path():
+			_cancel_auto_walk()
+			return
+
+	# Advance the path index past any hexes we've already entered.
+	while _auto_walk_path_index < _auto_walk_path.size() and _auto_walk_path[_auto_walk_path_index] == current_hex:
+		_auto_walk_path_index += 1
+
+	if _auto_walk_path_index >= _auto_walk_path.size():
+		# Path exhausted but not yet in range — recompute next frame.
+		_auto_walk_path.clear()
+		return
+
+	# Move toward the next hex on the path.
+	var next_hex: Vector2i = _auto_walk_path[_auto_walk_path_index]
+	var next_pos: Vector2 = HexHelper.axial_to_pixel(next_hex, hex_grid.hex_size)
+	var dir: Vector2 = (next_pos - position).normalized()
 	_apply_movement(dir, delta)
 
-	# Stuck detection
+	# Stuck detection — recompute path once before giving up.
 	_auto_walk_stuck_time += delta
 	if _auto_walk_stuck_time >= AUTO_WALK_STUCK_TIMEOUT:
-		_cancel_auto_walk()
-		return
+		_auto_walk_stuck_time = 0.0
+		if not _recompute_auto_walk_path():
+			_cancel_auto_walk()
+			return
 
 	# Re-check after movement
 	if HexHelper.distance(current_hex, target_hex) <= _auto_walk_range:
@@ -403,8 +442,9 @@ func _process_auto_walk(delta: float) -> void:
 
 func _finish_auto_walk() -> void:
 	var target := _auto_walk_target_hex as Vector2i
-	_auto_walk_target_pos = null
 	_auto_walk_target_hex = null
+	_auto_walk_path.clear()
+	_auto_walk_path_index = 0
 	is_auto_walking = false
 	_auto_walk_stuck_time = 0.0
 	SignalBus.hero_reached_build_range.emit(target)
@@ -413,8 +453,9 @@ func _finish_auto_walk() -> void:
 func _cancel_auto_walk() -> void:
 	if not is_auto_walking:
 		return
-	_auto_walk_target_pos = null
 	_auto_walk_target_hex = null
+	_auto_walk_path.clear()
+	_auto_walk_path_index = 0
 	is_auto_walking = false
 	_auto_walk_stuck_time = 0.0
 	SignalBus.build_walk_cancelled.emit()

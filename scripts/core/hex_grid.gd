@@ -122,6 +122,11 @@ func can_place_building(coord: Vector2i, building_data: Resource) -> bool:
 		return false
 	if int(tile.terrain) not in building_data.buildable_on:
 		return false
+	# Refuse the hero's current hex — placing a building there would trap the hero
+	# inside a non-walkable cell.
+	var hero: Node = get_tree().get_first_node_in_group(&"hero")
+	if hero != null and "current_hex" in hero and (hero.current_hex as Vector2i) == coord:
+		return false
 	return true
 
 
@@ -132,3 +137,62 @@ func get_all_building_coords() -> Array[Vector2i]:
 		if tiles[coord].has_building:
 			result.append(coord)
 	return result
+
+
+## Find a path from start to goal across walkable tiles using A*.
+##
+## - Returns an Array[Vector2i] of coordinates from start (inclusive) to the
+##   reached destination (inclusive). Empty array if no path exists.
+## - If `goal` itself is unwalkable (e.g. a hex where a building will be placed),
+##   the search succeeds when any walkable tile within `goal_range` of `goal` is
+##   reached. This lets the hero path adjacent to a build target without trying
+##   to step into it.
+## - `start` must be walkable; if not, returns an empty array.
+func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Vector2i]:
+	var empty: Array[Vector2i] = []
+	var start_tile: HexTile = get_tile(start)
+	if start_tile == null or not start_tile.is_walkable():
+		return empty
+	if HexHelper.distance(start, goal) <= goal_range:
+		return [start] as Array[Vector2i]
+
+	# Standard A* on the hex grid. f = g + h where h is hex distance to goal.
+	var open_set: Array[Vector2i] = [start]
+	var came_from: Dictionary = {}        # Vector2i -> Vector2i
+	var g_score: Dictionary = {start: 0}  # Vector2i -> int
+	var f_score: Dictionary = {start: HexHelper.distance(start, goal)}
+
+	while not open_set.is_empty():
+		# Pick node in open_set with the lowest f_score.
+		var current: Vector2i = open_set[0]
+		var current_idx: int = 0
+		for i in range(1, open_set.size()):
+			var node: Vector2i = open_set[i]
+			if int(f_score.get(node, 0x7fffffff)) < int(f_score.get(current, 0x7fffffff)):
+				current = node
+				current_idx = i
+		open_set.remove_at(current_idx)
+
+		if HexHelper.distance(current, goal) <= goal_range:
+			return _reconstruct_path(came_from, current)
+
+		for neighbor in get_walkable_neighbors(current):
+			var tentative_g: int = int(g_score[current]) + 1
+			if tentative_g < int(g_score.get(neighbor, 0x7fffffff)):
+				came_from[neighbor] = current
+				g_score[neighbor] = tentative_g
+				f_score[neighbor] = tentative_g + HexHelper.distance(neighbor, goal)
+				if neighbor not in open_set:
+					open_set.append(neighbor)
+
+	return empty
+
+
+## Walk the came_from chain backwards to reconstruct the path.
+func _reconstruct_path(came_from: Dictionary, end: Vector2i) -> Array[Vector2i]:
+	var path: Array[Vector2i] = [end]
+	var current: Vector2i = end
+	while came_from.has(current):
+		current = came_from[current]
+		path.push_front(current)
+	return path

@@ -93,9 +93,7 @@ res://
 ## Known Issues / Backlog
 > Tracked bugs and improvements to address before/during the next phase.
 
-1. **Hero gets stuck on existing buildings during multi-place auto-walk** — when placing buildings back-to-back, the straight-line auto-walk runs into a previously placed building and can't reach the new target. Needs proper hex-grid pathfinding (A*) for the hero auto-walk (`hero.gd::_process_auto_walk`).
-2. **Player can build on the hero's hex** — placing a building on the hero's current tile traps the hero permanently inside a non-walkable cell. `hex_grid.can_place_building` should reject the hero's current hex (and possibly any unit-occupied hex), or build flow should refuse if hero is on the target.
-3. **Day 1 starting wave too punishing** — 5 wasps from 5 directions is too much before the player has any defenses. Reduce Day 1 to ~2-3 wasps (or scale starting count down) in `wave_manager.gd::_build_wave_composition`.
+_(empty — Phase 5 backlog cleared: hex A* pathfinding, hero-hex placement guard, Day 1 wave rebalance.)_
 
 ## Phase 1 Details (Hex Grid)
 - **Grid type:** Pointy-top hex grid (axial coordinates q, r)
@@ -142,7 +140,7 @@ res://
   - `scripts/core/hero.gd` — Updated: night speed multiplier via SignalBus
 
 ## Phase 4 Details (Building Placement)
-- **Build flow:** Night starts → Build Menu auto-opens → player selects building → ghost preview follows mouse (green=valid, red=invalid) → click to place → hero auto-walks within 1 hex range → building placed with animation → stays in build mode for multi-placement
+- **Build flow:** Night starts → Build Menu auto-opens → player selects building → ghost preview follows mouse (green=valid, red=invalid) → click to place → hero auto-walks within 1 hex range (A* path-following, see Phase 5 backlog fix) → building placed with animation → stays in build mode for multi-placement
 - **Buildings:** Honey Turret (defense), Wall (blocks movement), Flower Garden (economy), Hive (pre-placed base at center)
 - **All buildings block movement** — hero cannot walk through any building
 - **Economy:** Free (no cost system yet — added in Phase 6)
@@ -208,3 +206,9 @@ res://
   - `scripts/ui/phase_hud.gd` — Wave progress text instead of seconds
   - `scenes/main/game.tscn` — Added Enemies/Projectiles containers, WaveManager, HiveHpBar, GameOverScreen
   - `project.godot` — EnemyRegistry autoload
+
+## Phase 5 Backlog Fixes (post-Phase 5)
+- **Hex A* pathfinding** — `hex_grid.find_path(start, goal, goal_range)` runs A* over walkable hexes; succeeds when any walkable hex within `goal_range` of an unwalkable goal is reached (so hero can path adjacent to a build target).
+- **Hero auto-walk follows path** — `hero.gd::_process_auto_walk` walks hex-by-hex along the A* path instead of straight-line, recomputes once on stuck timeout, then cancels. Fixes the multi-placement "hero stuck on previous building" bug.
+- **Hero-hex placement guard** — `hex_grid.can_place_building` now rejects the hero's current hex (group lookup `hero` + `current_hex` field), so the player can't trap the hero inside a non-walkable building cell. Ghost preview turns red automatically.
+- **Day 1 wave rebalance** — `wave_manager._build_wave_composition` wasp formula `5 + (day-1)*2` → `3 + (day-1)*2`. Day 1 = 3 wasps, Day 2 = 5 wasps + 1 hornet, etc. Same per-day scaling, gentler start.

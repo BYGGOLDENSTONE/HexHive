@@ -80,8 +80,8 @@ func _start_wave(day_number: int) -> void:
 ## Build the list of enemy ids for a given day.
 func _build_wave_composition(day_number: int) -> Array[StringName]:
 	var result: Array[StringName] = []
-	# Day 1: 5 wasps. +2 wasps per day. Hornets start day 2 with 1, +1 per day.
-	var wasp_count: int = 5 + (day_number - 1) * 2
+	# Day 1: 3 wasps (gentle ramp-up). +2 wasps per day. Hornets start day 2 with 1, +1 per day.
+	var wasp_count: int = 3 + (day_number - 1) * 2
 	var hornet_count: int = maxi(0, day_number - 1)
 	for i in range(wasp_count):
 		result.append(&"wasp")
