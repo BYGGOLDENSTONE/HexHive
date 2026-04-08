@@ -256,3 +256,7 @@ The placeholder procedural `_draw()` art for hero, enemies, and Honey Turret was
 
 ### Tooling
 - `tools/recolor_sprites.py` — Reusable Pillow + numpy script. `recolor_directory()` reads a source dir of PNGs and writes a renamed, recolored copy to a target dir. Pipeline: hue shift → saturation → brightness → contrast. Driven by a `main()` config block; rerun after the hero set changes to regenerate Wasp / Hornet.
+
+### Rejected approaches (do not retry without user request)
+- **Hand-crafted SVG humanoid bee** — tried, rejected (the SVG cartoon look did not match the Meshy 3D-render quality bar). See test at the end of the visual-pipeline migration session.
+- **Procedurally generated SVG hexagonal tower** — tried (parametric Python → SVG → PNG via Inkscape, 5-layer hex prism + pyramid roof + windows). User reaction: "çok kötü". The geometric SVG style does not blend with Meshy-rendered organic art either. All Meshy art stays the source of truth; SVG is reserved for UI vector icons only.
