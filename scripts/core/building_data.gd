@@ -50,6 +50,20 @@ extends Resource
 ## True if this building can be destroyed (false for invulnerable special buildings, currently unused).
 @export var destructible: bool = true
 
+# -- Sprite (optional, replaces procedural _draw body) --
+
+## Texture path for the static sprite. Empty = use procedural draw.
+@export var sprite_path: String = ""
+
+## Where the structure's visual *base* sits inside the texture, normalized
+## vertically (0 = top of image, 1 = bottom). Used to anchor the sprite so
+## its base hex sits centered on the tile.
+@export var sprite_baseline_v: float = 0.78
+
+## Sprite width relative to the hex tile width (sqrt(3) * hex_size).
+## 1.0 = sprite width matches one hex's width exactly.
+@export var sprite_width_factor: float = 1.0
+
 
 ## Get max HP for a given level (1-indexed, clamped to data length).
 func get_max_hp(level: int) -> float:

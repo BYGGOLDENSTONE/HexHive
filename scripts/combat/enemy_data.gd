@@ -32,6 +32,14 @@ extends Resource
 ## Visual size in pixels (radius of the body).
 @export var visual_size: float = 18.0
 
+## Sprite directory under res://assets/sprites/. Files are expected as
+## `{sprite_dir}_{n,ne,e,se,s,sw,w,nw}.png`. Empty = fall back to procedural.
+@export var sprite_dir: StringName = &""
+
+## How big the sprite renders relative to visual_size (1.0 = sprite radius
+## matches visual_size). Bigger lets wings show.
+@export var sprite_scale_factor: float = 2.4
+
 ## Body fill color.
 @export var body_color: Color = Color(0.95, 0.85, 0.2, 1.0)
 

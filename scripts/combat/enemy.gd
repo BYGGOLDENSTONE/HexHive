@@ -29,17 +29,37 @@ var _attack_cooldown: float = 0.0
 ## Time alive — used to delay AI start so the spawn animation can play.
 var _age: float = 0.0
 
-## Wing flap phase for visual animation.
-var _wing_phase: float = 0.0
-
 ## Damage flash timer (>0 = currently flashing red).
 var _flash_timer: float = 0.0
 
-## Recent attack lunge offset (decays each frame, drives a small forward jab).
-var _attack_lunge: float = 0.0
-
 ## True after death — disables AI and starts fade out.
 var _is_dying: bool = false
+
+## -- Sprite & hover state --
+
+## Cached 8-direction texture sets, keyed by sprite_dir StringName.
+## Each value is a Dictionary[StringName, Texture2D] keyed by direction name.
+static var _TEXTURE_CACHE: Dictionary = {}
+
+## Direction names indexed by 45-degree sector starting at East = 0.
+const DIRECTION_BY_SECTOR: Array[StringName] = [
+	&"e", &"se", &"s", &"sw", &"w", &"nw", &"n", &"ne",
+]
+
+## Sprite child node (created in _ready when sprite_dir is set).
+var _sprite: Sprite2D
+
+## Currently displayed facing direction.
+var _facing: StringName = &"s"
+
+## Hover animation phase (radians).
+var _hover_time: float = 0.0
+
+## Hover bobbing frequency (rad/s).
+const HOVER_FREQUENCY: float = 5.5
+
+## Hover amplitude in pixels (scaled by visual_size).
+const HOVER_AMPLITUDE_FACTOR: float = 0.18
 
 ## Current axial coordinate (cached for retarget queries).
 var _current_hex: Vector2i = Vector2i.ZERO
@@ -68,6 +88,10 @@ func setup(enemy_data: Resource, grid: HexGrid, world_pos: Vector2) -> void:
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 
+	# Sprite is created here (not in _ready) because spawners call setup()
+	# AFTER add_child(), so data is already populated by this point.
+	_setup_sprite()
+
 
 func _ready() -> void:
 	add_to_group(&"enemies")
@@ -82,12 +106,60 @@ func _ready() -> void:
 	tw.tween_property(self, "modulate:a", 1.0, 0.25)
 
 
+## Creates the directional Sprite2D child if the data has a sprite_dir set.
+## Loads (and caches) the 8-direction texture set on first use per sprite_dir.
+func _setup_sprite() -> void:
+	if data == null or data.sprite_dir == &"":
+		return
+	var textures: Dictionary = _get_or_load_textures(data.sprite_dir)
+	if textures.is_empty():
+		return
+	_sprite = Sprite2D.new()
+	_sprite.name = "Sprite"
+	_sprite.z_index = -1
+	_sprite.texture = textures[_facing]
+	# Scale so the sprite roughly spans visual_size * sprite_scale_factor pixels.
+	var tex_w: float = float(_sprite.texture.get_width())
+	if tex_w > 0.0:
+		var target_px: float = data.visual_size * 2.0 * data.sprite_scale_factor
+		var s: float = target_px / tex_w
+		_sprite.scale = Vector2(s, s)
+	add_child(_sprite)
+
+
+static func _get_or_load_textures(sprite_dir: StringName) -> Dictionary:
+	if _TEXTURE_CACHE.has(sprite_dir):
+		return _TEXTURE_CACHE[sprite_dir]
+	var dirs: Array[StringName] = [&"n", &"ne", &"e", &"se", &"s", &"sw", &"w", &"nw"]
+	var tex_set: Dictionary = {}
+	for d in dirs:
+		var path: String = "res://assets/sprites/%s/%s_%s.png" % [sprite_dir, sprite_dir, d]
+		if not ResourceLoader.exists(path):
+			push_warning("Enemy sprite missing: %s" % path)
+			continue
+		tex_set[d] = load(path)
+	if tex_set.is_empty():
+		return {}
+	_TEXTURE_CACHE[sprite_dir] = tex_set
+	return tex_set
+
+
 func _process(delta: float) -> void:
-	_wing_phase += delta * 22.0
 	if _flash_timer > 0.0:
 		_flash_timer = maxf(0.0, _flash_timer - delta)
-	if _attack_lunge > 0.0:
-		_attack_lunge = maxf(0.0, _attack_lunge - delta * 6.0)
+
+	# Hover bobbing — applied to sprite local position so the entity origin
+	# stays put for hex tracking and combat math.
+	_hover_time += delta * HOVER_FREQUENCY
+	if _sprite != null:
+		var amp: float = (data.visual_size if data != null else 18.0) * HOVER_AMPLITUDE_FACTOR
+		_sprite.position = Vector2(0.0, sin(_hover_time) * amp)
+		if _flash_timer > 0.0:
+			var t: float = _flash_timer / 0.18
+			_sprite.modulate = Color(1.0, 1.0 - 0.55 * t, 1.0 - 0.55 * t, 1.0)
+		else:
+			_sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
 	queue_redraw()
 
 
@@ -111,10 +183,31 @@ func _physics_process(delta: float) -> void:
 
 	if dist <= data.attack_range:
 		_try_attack(delta)
+		# Even when attacking, face the target.
+		if dist > 0.001:
+			_set_facing_from_vector(to_target / dist)
 	else:
 		var dir: Vector2 = to_target / dist if dist > 0.001 else Vector2.ZERO
 		position += dir * data.move_speed * delta
+		_set_facing_from_vector(dir)
 		_update_hex_tracking()
+
+
+## Maps a direction vector to one of the 8 sprite directions and updates the
+## sprite texture if the facing actually changed.
+func _set_facing_from_vector(v: Vector2) -> void:
+	if _sprite == null or v.length_squared() < 0.0001:
+		return
+	var deg: float = rad_to_deg(v.angle())
+	deg = fposmod(deg, 360.0)
+	var sector: int = int(round(deg / 45.0)) % 8
+	var dir_name: StringName = DIRECTION_BY_SECTOR[sector]
+	if dir_name == _facing:
+		return
+	_facing = dir_name
+	var textures: Dictionary = _TEXTURE_CACHE.get(data.sprite_dir, {})
+	if textures.has(_facing):
+		_sprite.texture = textures[_facing]
 
 
 func _update_hex_tracking() -> void:
@@ -195,7 +288,6 @@ func _try_attack(delta: float) -> void:
 		return
 	if current_target.has_method("take_damage"):
 		current_target.take_damage(data.attack_damage)
-		_attack_lunge = 1.0
 		_attack_cooldown = 1.0 / maxf(data.attack_speed, 0.01)
 
 
@@ -242,118 +334,17 @@ func is_alive() -> bool:
 func _draw() -> void:
 	if data == null:
 		return
-
-	var size: float = data.visual_size
-	var lunge: Vector2 = Vector2(0.0, -size * 0.18 * _attack_lunge)
-	var flap: float = sin(_wing_phase) * 0.35
-
-	# Wings — two semi-transparent ellipses behind the body.
-	_draw_wing(Vector2(-size * 0.55, -size * 0.1) + lunge, size * 0.85, size * 0.45, flap, true)
-	_draw_wing(Vector2(size * 0.55, -size * 0.1) + lunge, size * 0.85, size * 0.45, -flap, false)
-
-	# Body composed of 3 ellipsoid segments: abdomen, thorax, head.
-	var abdomen_pos: Vector2 = Vector2(0.0, size * 0.55) + lunge
-	var thorax_pos: Vector2 = Vector2(0.0, size * 0.05) + lunge
-	var head_pos: Vector2 = Vector2(0.0, -size * 0.5) + lunge
-
-	# Abdomen with stripes.
-	_draw_ellipse(abdomen_pos, size * 0.55, size * 0.7, data.body_color)
-	_draw_ellipse_outline(abdomen_pos, size * 0.55, size * 0.7, data.accent_color.darkened(0.1), 2.0)
-	# Stripes on abdomen
-	for i in range(3):
-		var stripe_y: float = abdomen_pos.y - size * 0.35 + i * size * 0.32
-		var stripe_w: float = size * 0.5 - i * size * 0.05
-		draw_rect(Rect2(-stripe_w, stripe_y, stripe_w * 2.0, size * 0.13), data.accent_color)
-
-	# Stinger — sharp triangle at the bottom.
-	var stinger_base: Vector2 = abdomen_pos + Vector2(0.0, size * 0.65)
-	var stinger_tip: Vector2 = stinger_base + Vector2(0.0, size * 0.4)
-	var stinger_l: Vector2 = stinger_base + Vector2(-size * 0.12, 0.0)
-	var stinger_r: Vector2 = stinger_base + Vector2(size * 0.12, 0.0)
-	draw_colored_polygon(PackedVector2Array([stinger_tip, stinger_l, stinger_r]), data.accent_color.darkened(0.2))
-	draw_line(stinger_l, stinger_tip, data.accent_color.darkened(0.5), 1.5, true)
-	draw_line(stinger_r, stinger_tip, data.accent_color.darkened(0.5), 1.5, true)
-
-	# Thorax — smaller fuzzy ellipse.
-	_draw_ellipse(thorax_pos, size * 0.5, size * 0.45, data.body_color.darkened(0.05))
-	_draw_ellipse_outline(thorax_pos, size * 0.5, size * 0.45, data.accent_color.darkened(0.1), 1.8)
-
-	# Head — round, with eyes and antennae.
-	_draw_ellipse(head_pos, size * 0.4, size * 0.4, data.body_color.darkened(0.1))
-	_draw_ellipse_outline(head_pos, size * 0.4, size * 0.4, data.accent_color.darkened(0.1), 1.6)
-
-	# Eyes — two glowing circles.
-	var eye_off: float = size * 0.18
-	var eye_r: float = size * 0.11
-	draw_circle(head_pos + Vector2(-eye_off, -size * 0.05), eye_r, data.accent_color.darkened(0.4))
-	draw_circle(head_pos + Vector2(eye_off, -size * 0.05), eye_r, data.accent_color.darkened(0.4))
-	draw_circle(head_pos + Vector2(-eye_off, -size * 0.05), eye_r * 0.55, data.eye_color)
-	draw_circle(head_pos + Vector2(eye_off, -size * 0.05), eye_r * 0.55, data.eye_color)
-	# Eye highlights
-	draw_circle(head_pos + Vector2(-eye_off + size * 0.03, -size * 0.08), eye_r * 0.18, Color(1.0, 1.0, 1.0, 0.85))
-	draw_circle(head_pos + Vector2(eye_off + size * 0.03, -size * 0.08), eye_r * 0.18, Color(1.0, 1.0, 1.0, 0.85))
-
-	# Antennae.
-	var ant_base_l: Vector2 = head_pos + Vector2(-size * 0.18, -size * 0.32)
-	var ant_base_r: Vector2 = head_pos + Vector2(size * 0.18, -size * 0.32)
-	var ant_tip_l: Vector2 = ant_base_l + Vector2(-size * 0.25, -size * 0.4)
-	var ant_tip_r: Vector2 = ant_base_r + Vector2(size * 0.25, -size * 0.4)
-	draw_line(ant_base_l, ant_tip_l, data.accent_color, 2.0, true)
-	draw_line(ant_base_r, ant_tip_r, data.accent_color, 2.0, true)
-	draw_circle(ant_tip_l, size * 0.07, data.accent_color)
-	draw_circle(ant_tip_r, size * 0.07, data.accent_color)
-
-	# Damage flash overlay — bright red wash.
-	if _flash_timer > 0.0:
-		var alpha: float = (_flash_timer / 0.18) * 0.55
-		var flash_color := Color(1.0, 0.3, 0.2, alpha)
-		_draw_ellipse(thorax_pos, size * 0.7, size * 0.95, flash_color)
-
-	# Health bar (only when damaged).
+	# Body is rendered by the directional Sprite2D child. Only the HP bar is
+	# drawn here so it stays at a fixed position above the bobbing sprite.
 	if health and health.current_hp < health.max_hp and not _is_dying:
-		_draw_health_bar(size)
-
-
-func _draw_wing(center: Vector2, w: float, h: float, tilt: float, left_side: bool) -> void:
-	var pts := PackedVector2Array()
-	var seg: int = 16
-	var side_sign: float = -1.0 if left_side else 1.0
-	for i in range(seg):
-		var t: float = TAU * i / seg
-		var x: float = cos(t) * w + side_sign * h * tilt * 0.5
-		var y: float = sin(t) * h + (cos(t) * tilt * h * 0.6)
-		pts.append(center + Vector2(x, y))
-	draw_colored_polygon(pts, data.wing_color)
-	# Wing veins
-	var vein_color := Color(data.accent_color.r, data.accent_color.g, data.accent_color.b, 0.4)
-	for i in range(seg):
-		var next: int = (i + 1) % seg
-		draw_line(pts[i], pts[next], vein_color, 1.0, true)
-
-
-func _draw_ellipse(center: Vector2, rx: float, ry: float, color: Color) -> void:
-	var pts := PackedVector2Array()
-	var seg: int = 18
-	for i in range(seg):
-		var t: float = TAU * i / seg
-		pts.append(center + Vector2(cos(t) * rx, sin(t) * ry))
-	draw_colored_polygon(pts, color)
-
-
-func _draw_ellipse_outline(center: Vector2, rx: float, ry: float, color: Color, width: float) -> void:
-	var seg: int = 18
-	for i in range(seg):
-		var t1: float = TAU * i / seg
-		var t2: float = TAU * (i + 1) / seg
-		var p1: Vector2 = center + Vector2(cos(t1) * rx, sin(t1) * ry)
-		var p2: Vector2 = center + Vector2(cos(t2) * rx, sin(t2) * ry)
-		draw_line(p1, p2, color, width, true)
+		_draw_health_bar(data.visual_size)
 
 
 func _draw_health_bar(size: float) -> void:
-	var width: float = size * 1.6
+	var width: float = size * 2.0
 	var height: float = 4.0
-	var y: float = -size * 1.4
+	# Place the bar above the sprite (sprite spans ~size * sprite_scale_factor).
+	var y: float = -size * (data.sprite_scale_factor + 0.2)
 	var bg_rect := Rect2(-width / 2.0, y, width, height)
 	draw_rect(bg_rect, Color(0.05, 0.05, 0.05, 0.85))
 	var frac: float = health.get_fraction()

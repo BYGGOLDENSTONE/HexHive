@@ -43,6 +43,9 @@ var _projectiles_container: Node2D = null
 ## True after death — disables further updates.
 var _is_dying: bool = false
 
+## Optional static Sprite2D child (created when data.sprite_path is set).
+var _sprite: Sprite2D
+
 
 ## Initialize the building with its data, coordinate, and position.
 func setup(building_data: Resource, coord: Vector2i, world_pos: Vector2, hex_size: float) -> void:
@@ -61,6 +64,46 @@ func setup(building_data: Resource, coord: Vector2i, world_pos: Vector2, hex_siz
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 
+	# If this building has a static sprite, instantiate it now so the
+	# procedural _draw body can be skipped.
+	_setup_sprite()
+
+
+## Creates a static Sprite2D child if data.sprite_path is set.
+## The sprite is sized so its width matches the hex tile width and is
+## anchored so its visual base (data.sprite_baseline_v) sits centered on
+## the tile origin.
+func _setup_sprite() -> void:
+	if data == null or data.sprite_path == "":
+		return
+	if not ResourceLoader.exists(data.sprite_path):
+		push_warning("Building sprite missing: %s" % data.sprite_path)
+		return
+	var tex: Texture2D = load(data.sprite_path) as Texture2D
+	if tex == null:
+		return
+	_sprite = Sprite2D.new()
+	_sprite.name = "Sprite"
+	_sprite.texture = tex
+	# Tall structures (towers) must always render above walls, hero, etc.
+	# Use absolute z so the sprite isn't pulled down by the parent's z = -1.
+	_sprite.z_as_relative = false
+	_sprite.z_index = 10
+	# Width = pointy-top hex width (sqrt(3) * size). Multiplied by data factor.
+	var hex_width: float = sqrt(3.0) * _draw_size * data.sprite_width_factor
+	var tex_w: float = float(tex.get_width())
+	var tex_h: float = float(tex.get_height())
+	if tex_w <= 0.0 or tex_h <= 0.0:
+		return
+	var s: float = hex_width / tex_w
+	_sprite.scale = Vector2(s, s)
+	# Sprite is centered by default — move it up so the visual baseline
+	# (texture y = tex_h * baseline_v) lands on world y = 0.
+	var baseline_y_in_tex: float = tex_h * data.sprite_baseline_v
+	var center_y_in_tex: float = tex_h * 0.5
+	_sprite.position = Vector2(0.0, -(baseline_y_in_tex - center_y_in_tex) * s)
+	add_child(_sprite)
+
 
 func _process(delta: float) -> void:
 	if _is_dying:
@@ -68,6 +111,15 @@ func _process(delta: float) -> void:
 	if _flash_timer > 0.0:
 		_flash_timer = maxf(0.0, _flash_timer - delta)
 		queue_redraw()
+
+	# Sprite-based buildings: tint via modulate so the flash matches the
+	# rendered art instead of being a flat hex overlay.
+	if _sprite != null:
+		if _flash_timer > 0.0:
+			var t: float = _flash_timer / 0.18
+			_sprite.modulate = Color(1.0, 1.0 - 0.55 * t, 1.0 - 0.55 * t, 1.0)
+		else:
+			_sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 	# Hive low-HP warning pulse.
 	if data != null and data.id == &"hive" and health != null and health.get_fraction() < 0.5:
@@ -212,22 +264,26 @@ func _draw() -> void:
 		var t: float = (sin(_pulse_phase) + 1.0) * 0.5
 		base_color = base_color.lerp(Color(1.0, 0.3, 0.2), t * 0.45)
 
-	if data.id == &"honey_turret":
-		_draw_turret(base_color, accent)
-	elif data.id == &"wall":
-		_draw_wall(base_color, accent)
-	elif data.id == &"flower_garden":
-		_draw_flower_garden(base_color, accent)
-	elif data.id == &"hive":
-		_draw_hive(base_color, accent)
-	else:
-		_draw_generic(base_color, accent)
+	# When a static sprite is in use, skip the procedural body — only the
+	# overlays (flash, HP bar) are drawn here. Sprite flash is applied via
+	# modulate in _process.
+	if _sprite == null:
+		if data.id == &"honey_turret":
+			_draw_turret(base_color, accent)
+		elif data.id == &"wall":
+			_draw_wall(base_color, accent)
+		elif data.id == &"flower_garden":
+			_draw_flower_garden(base_color, accent)
+		elif data.id == &"hive":
+			_draw_hive(base_color, accent)
+		else:
+			_draw_generic(base_color, accent)
 
-	# Damage flash overlay.
-	if _flash_timer > 0.0:
-		var alpha: float = (_flash_timer / 0.18) * 0.5
-		var corners := HexHelper.get_hex_corners(Vector2.ZERO, _draw_size)
-		draw_colored_polygon(corners, Color(1.0, 0.4, 0.3, alpha))
+		# Damage flash overlay (procedural buildings only).
+		if _flash_timer > 0.0:
+			var alpha: float = (_flash_timer / 0.18) * 0.5
+			var corners := HexHelper.get_hex_corners(Vector2.ZERO, _draw_size)
+			draw_colored_polygon(corners, Color(1.0, 0.4, 0.3, alpha))
 
 	# Damaged buildings show a small HP bar (Hive uses dedicated HUD bar instead).
 	if health != null and health.current_hp < health.max_hp and not _is_dying and data.id != &"hive":

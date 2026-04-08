@@ -22,6 +22,16 @@ var _speed_multiplier: float = 1.5
 ## Visual scale relative to a slot hex (1.0 = same size as slot).
 @export var visual_scale: float = 1.1
 
+## How big the sprite renders relative to the hex slot diameter.
+## 1.0 = sprite spans one slot diameter; >1 = larger so wings show.
+@export var sprite_scale_factor: float = 2.6
+
+## Hover (idle bobbing) frequency in radians per second.
+@export var hover_frequency: float = 5.0
+
+## Hover amplitude in pixels.
+@export var hover_amplitude: float = 3.5
+
 ## -- Combat stats --
 
 ## Maximum HP.
@@ -95,6 +105,34 @@ var _projectiles_container: Node2D = null
 ## Spawn position (set on first ready, used for respawn).
 var _spawn_position: Vector2 = Vector2.ZERO
 
+## -- Sprite & hover state --
+
+## 8-direction sprite textures (preloaded).
+const SPRITE_TEXTURES: Dictionary = {
+	&"e":  preload("res://assets/sprites/hero/hero_e.png"),
+	&"se": preload("res://assets/sprites/hero/hero_se.png"),
+	&"s":  preload("res://assets/sprites/hero/hero_s.png"),
+	&"sw": preload("res://assets/sprites/hero/hero_sw.png"),
+	&"w":  preload("res://assets/sprites/hero/hero_w.png"),
+	&"nw": preload("res://assets/sprites/hero/hero_nw.png"),
+	&"n":  preload("res://assets/sprites/hero/hero_n.png"),
+	&"ne": preload("res://assets/sprites/hero/hero_ne.png"),
+}
+
+## Direction names indexed by 45-degree sector starting at East = 0.
+const DIRECTION_BY_SECTOR: Array[StringName] = [
+	&"e", &"se", &"s", &"sw", &"w", &"nw", &"n", &"ne",
+]
+
+## Sprite child node (created in _ready).
+var _sprite: Sprite2D
+
+## Currently displayed facing direction.
+var _facing: StringName = &"se"
+
+## Hover animation phase (radians).
+var _hover_time: float = 0.0
+
 
 func _ready() -> void:
 	add_to_group(&"hero")
@@ -115,6 +153,19 @@ func _ready() -> void:
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 
+	# Create the directional sprite child. Drawn behind the hero's _draw output
+	# (HP bar, respawn ring) via z_index = -1.
+	_sprite = Sprite2D.new()
+	_sprite.name = "Sprite"
+	_sprite.z_index = -1
+	_sprite.texture = SPRITE_TEXTURES[_facing]
+	var tex_w: float = float(_sprite.texture.get_width())
+	if tex_w > 0.0:
+		var sprite_pixel_target: float = _draw_size * 2.0 * sprite_scale_factor
+		var s: float = sprite_pixel_target / tex_w
+		_sprite.scale = Vector2(s, s)
+	add_child(_sprite)
+
 	SignalBus.phase_changed.connect(_on_phase_changed)
 	SignalBus.build_walk_requested.connect(_on_build_walk_requested)
 	SignalBus.restart_requested.connect(_on_restart_requested)
@@ -124,25 +175,52 @@ func _process(delta: float) -> void:
 	if _flash_timer > 0.0:
 		_flash_timer = maxf(0.0, _flash_timer - delta)
 
+	# Hover bobbing — independent of dead/alive so the visual stays alive feeling
+	# (skipped while dead since the sprite is hidden anyway).
+	_hover_time += delta * hover_frequency
+
 	if _is_dead:
+		if _sprite != null:
+			_sprite.visible = false
 		_respawn_timer = maxf(0.0, _respawn_timer - delta)
 		if _respawn_timer <= 0.0:
 			_respawn()
 		queue_redraw()
 		return
 
+	if _sprite != null and not _sprite.visible:
+		_sprite.visible = true
+
+	# Track movement input so we can update facing only when actually moving.
+	var moved_dir: Vector2 = Vector2.ZERO
+
 	if is_auto_walking:
 		var input_dir := _get_input_direction()
 		if input_dir != Vector2.ZERO:
 			_cancel_auto_walk()
 			_apply_movement(input_dir, delta)
+			moved_dir = input_dir
 		else:
-			_process_auto_walk(delta)
+			moved_dir = _process_auto_walk(delta)
 	else:
 		var input_dir := _get_input_direction()
 		if input_dir != Vector2.ZERO:
 			_apply_movement(input_dir, delta)
+			moved_dir = input_dir
 	_update_hex_tracking()
+
+	# Update facing sprite if there is meaningful movement input.
+	if moved_dir.length_squared() > 0.0001:
+		_set_facing_from_vector(moved_dir)
+
+	# Apply hover offset and damage flash to the sprite.
+	if _sprite != null:
+		_sprite.position = Vector2(0.0, sin(_hover_time) * hover_amplitude)
+		if _flash_timer > 0.0:
+			var t: float = _flash_timer / 0.18
+			_sprite.modulate = Color(1.0, 1.0 - 0.55 * t, 1.0 - 0.55 * t, 1.0)
+		else:
+			_sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 	# Auto-attack during day phase.
 	if DayNightManager.is_day():
@@ -154,6 +232,21 @@ func _process(delta: float) -> void:
 				_attack_cooldown = 1.0 / maxf(attack_speed, 0.01)
 
 	queue_redraw()
+
+
+## Maps a movement vector to one of the 8 sprite directions and updates the
+## sprite texture if the facing actually changed.
+func _set_facing_from_vector(v: Vector2) -> void:
+	# atan2 in Godot: 0 = +X (east), +PI/2 = +Y (south, screen down).
+	var deg: float = rad_to_deg(v.angle())
+	deg = fposmod(deg, 360.0)
+	var sector: int = int(round(deg / 45.0)) % 8
+	var dir_name: StringName = DIRECTION_BY_SECTOR[sector]
+	if dir_name == _facing:
+		return
+	_facing = dir_name
+	if _sprite != null:
+		_sprite.texture = SPRITE_TEXTURES[_facing]
 
 
 func _get_input_direction() -> Vector2:
@@ -303,43 +396,20 @@ func _draw() -> void:
 		_draw_respawn_indicator()
 		return
 
-	# Hero body — flat-top hex shape, warm gold
-	var corners := HexHelper.get_flat_hex_corners(Vector2.ZERO, _draw_size)
-	draw_colored_polygon(corners, Color(0.95, 0.75, 0.2, 0.9))
+	# Body is rendered by the directional Sprite2D child; only overlays here.
+	# Damage flash is applied to the sprite's modulate in _process.
 
-	# Thick outline — darker gold
-	for i in range(corners.size()):
-		var next := (i + 1) % corners.size()
-		draw_line(corners[i], corners[next], Color(0.75, 0.55, 0.1, 1.0), 2.5, true)
-
-	# Inner glow — lighter center hex
-	var inner := HexHelper.get_flat_hex_corners(Vector2.ZERO, _draw_size * 0.55)
-	draw_colored_polygon(inner, Color(1.0, 0.9, 0.5, 0.6))
-
-	# Direction indicator — small upward triangle
-	var s := _draw_size * 0.3
-	var off := Vector2(0.0, -_draw_size * 0.35)
-	var tri := PackedVector2Array([
-		off + Vector2(0.0, -s),
-		off + Vector2(-s * 0.6, s * 0.4),
-		off + Vector2(s * 0.6, s * 0.4),
-	])
-	draw_colored_polygon(tri, Color(1.0, 1.0, 1.0, 0.8))
-
-	# Damage flash overlay.
-	if _flash_timer > 0.0:
-		var alpha: float = (_flash_timer / 0.18) * 0.55
-		draw_colored_polygon(corners, Color(1.0, 0.3, 0.2, alpha))
-
-	# HP bar (only when damaged).
+	# HP bar (only when damaged). Drawn at a fixed offset so it doesn't bob
+	# with the hover animation.
 	if health != null and health.current_hp < health.max_hp:
 		_draw_hp_bar()
 
 
 func _draw_hp_bar() -> void:
-	var width: float = _draw_size * 1.6
+	var width: float = _draw_size * 2.2
 	var height: float = 5.0
-	var y: float = -_draw_size * 1.5
+	# Place above the sprite (sprite spans ~_draw_size * sprite_scale_factor px high).
+	var y: float = -_draw_size * (sprite_scale_factor + 0.2)
 	draw_rect(Rect2(-width / 2.0, y, width, height), Color(0.05, 0.05, 0.05, 0.85))
 	var frac: float = health.get_fraction()
 	var col: Color = Color(0.4, 0.95, 0.4, 1.0) if frac > 0.5 else (Color(1.0, 0.85, 0.3, 1.0) if frac > 0.25 else Color(1.0, 0.35, 0.3, 1.0))
@@ -394,23 +464,25 @@ func _recompute_auto_walk_path() -> bool:
 	return true
 
 
-func _process_auto_walk(delta: float) -> void:
+## Returns the movement direction the hero stepped this frame (Vector2.ZERO
+## when no movement happened) so the caller can update facing.
+func _process_auto_walk(delta: float) -> Vector2:
 	if _auto_walk_target_hex == null:
 		_cancel_auto_walk()
-		return
+		return Vector2.ZERO
 
 	var target_hex: Vector2i = _auto_walk_target_hex as Vector2i
 
 	# Already in range — done.
 	if HexHelper.distance(current_hex, target_hex) <= _auto_walk_range:
 		_finish_auto_walk()
-		return
+		return Vector2.ZERO
 
 	# If we have no usable path step, try to recompute.
 	if _auto_walk_path.is_empty() or _auto_walk_path_index >= _auto_walk_path.size():
 		if not _recompute_auto_walk_path():
 			_cancel_auto_walk()
-			return
+			return Vector2.ZERO
 
 	# Advance the path index past any hexes we've already entered.
 	while _auto_walk_path_index < _auto_walk_path.size() and _auto_walk_path[_auto_walk_path_index] == current_hex:
@@ -419,7 +491,7 @@ func _process_auto_walk(delta: float) -> void:
 	if _auto_walk_path_index >= _auto_walk_path.size():
 		# Path exhausted but not yet in range — recompute next frame.
 		_auto_walk_path.clear()
-		return
+		return Vector2.ZERO
 
 	# Move toward the next hex on the path.
 	var next_hex: Vector2i = _auto_walk_path[_auto_walk_path_index]
@@ -433,11 +505,12 @@ func _process_auto_walk(delta: float) -> void:
 		_auto_walk_stuck_time = 0.0
 		if not _recompute_auto_walk_path():
 			_cancel_auto_walk()
-			return
+			return Vector2.ZERO
 
 	# Re-check after movement
 	if HexHelper.distance(current_hex, target_hex) <= _auto_walk_range:
 		_finish_auto_walk()
+	return dir
 
 
 func _finish_auto_walk() -> void:
