@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hive_hp_bar.tscn" id="13"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_over_screen.tscn" id="14"]
 [ext_resource type="PackedScene" path="res://scenes/ui/sprite_editor_panel.tscn" id="15"]
+[ext_resource type="PackedScene" path="res://scenes/ui/tile_editor_panel.tscn" id="16"]
 
 [node name="Game" type="Node2D" unique_id=245950506]
 
@@ -73,3 +74,5 @@ script = ExtResource("5")
 [node name="GameOverScreen" parent="." unique_id=38293358 instance=ExtResource("14")]
 
 [node name="SpriteEditorPanel" parent="." instance=ExtResource("15")]
+
+[node name="TileEditorPanel" parent="." instance=ExtResource("16")]

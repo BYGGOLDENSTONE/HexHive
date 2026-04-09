@@ -20,6 +20,16 @@ var pixel_center: Vector2
 ## Terrain type
 var terrain: TerrainType = TerrainType.GRASS
 
+## Elevation level (0 = low ground, 1 = high ground)
+var elevation: int = 0
+
+## Whether this tile is a ramp (transition between elevations)
+var is_ramp: bool = false
+
+## Direction index (0-5) pointing from this ramp tile toward the LOW side.
+## Only meaningful when is_ramp == true. -1 = unset.
+var ramp_exit_dir: int = -1
+
 ## Whether a building occupies this tile
 var has_building: bool = false
 

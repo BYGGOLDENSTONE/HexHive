@@ -25,6 +25,7 @@ var hovered_coord: Variant = null
 func _ready() -> void:
 	slot_radius = hex_size * 3.0 / 5.0
 	_generate_map()
+	_setup_elevation()
 
 
 ## Generate a hex-shaped map with the given radius.
@@ -36,9 +37,50 @@ func _generate_map() -> void:
 		tiles[coord] = tile
 
 
+## Set up the test elevation island: radius-3 elevated plateau with 2 ramps.
+func _setup_elevation() -> void:
+	var island_radius: int = 3
+	var center: Vector2i = Vector2i.ZERO
+
+	# Ramp positions (border hexes) and their exit directions toward LOW ground
+	# (0, 3)  = south ramp  → exit toward SE direction index 5 which is (0,1) → (0,4)
+	# (-3, 0) = west ramp   → exit toward W  direction index 3 which is (-1,0) → (-4,0)
+	var ramp_configs: Array = [
+		{"coord": Vector2i(0, 3),  "exit_dir": 5},   # south, exits SE toward (0,4)
+		{"coord": Vector2i(-3, 0), "exit_dir": 3},    # west, exits W toward (-4,0)
+	]
+	var ramp_coords: Array[Vector2i] = []
+	for cfg in ramp_configs:
+		ramp_coords.append(cfg["coord"] as Vector2i)
+
+	# Mark island hexes as elevated
+	for coord_key: Vector2i in tiles:
+		var dist: int = HexHelper.distance(center, coord_key)
+		if dist <= island_radius:
+			var tile: HexTile = tiles[coord_key]
+			tile.elevation = 1
+
+	# Mark ramp tiles
+	for cfg in ramp_configs:
+		var ramp_coord: Vector2i = cfg["coord"] as Vector2i
+		var tile: HexTile = get_tile(ramp_coord)
+		if tile:
+			tile.is_ramp = true
+			tile.ramp_exit_dir = cfg["exit_dir"] as int
+
+
 ## Get the tile at a given axial coordinate, or null if out of bounds.
 func get_tile(coord: Vector2i) -> HexTile:
 	return tiles.get(coord) as HexTile
+
+
+## Get the effective hex size for a tile, accounting for elevation.
+## Elevated tiles get a slight scale boost to appear more dominant.
+func get_effective_hex_size(coord: Vector2i) -> float:
+	var tile: HexTile = get_tile(coord)
+	if tile and tile.elevation > 0:
+		return hex_size * 1.1
+	return hex_size
 
 
 ## Check if a coordinate is within the map.

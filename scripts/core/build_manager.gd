@@ -44,18 +44,23 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			if _state != BuildState.IDLE:
+				_cancel_build()
+				get_viewport().set_input_as_handled()
+			elif DayNightManager.is_night():
+				_try_remove_building_at_mouse()
+				get_viewport().set_input_as_handled()
+			return
+
 	if _state == BuildState.IDLE:
 		return
 
-	# Cancel build on ESC or right-click
 	if event.is_action_pressed("cancel_build"):
 		_cancel_build()
 		get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel_build()
-			get_viewport().set_input_as_handled()
 
 
 func _on_build_requested(building_id: StringName) -> void:
@@ -146,7 +151,7 @@ func _execute_build() -> void:
 
 	# Instantiate building
 	var building: Node2D = _building_scene.instantiate() as Node2D
-	building.setup(_selected_data, coord, world_pos, hex_grid.hex_size)
+	building.setup(_selected_data, coord, world_pos, hex_grid.get_effective_hex_size(coord))
 	buildings_container.add_child(building)
 
 	# Register on grid
@@ -188,6 +193,26 @@ func get_selected_data() -> Resource:
 	return _selected_data
 
 
+## Try to remove a building at the mouse position (right-click in IDLE + night).
+## Hive cannot be removed.
+func _try_remove_building_at_mouse() -> void:
+	var mouse_world: Vector2 = get_global_mouse_position()
+	var coord: Vector2i = hex_grid.world_to_hex(mouse_world)
+	var tile: HexTile = hex_grid.get_tile(coord)
+	if tile == null or not tile.has_building:
+		return
+	var building: Node2D = tile.building as Node2D
+	if building == null:
+		return
+	# Never allow removing the Hive
+	if building.data != null and building.data.id == &"hive":
+		return
+	# Remove from grid
+	hex_grid.remove_building(coord)
+	# Destroy the building node
+	building.queue_free()
+
+
 ## Place the starting Hive at the center of the map.
 func _place_starting_hive() -> void:
 	var hive_data := BuildingRegistry.get_building(&"hive")
@@ -205,6 +230,6 @@ func _place_starting_hive() -> void:
 
 	var world_pos := hex_grid.hex_to_world(coord)
 	var building: Node2D = _building_scene.instantiate() as Node2D
-	building.setup(hive_data, coord, world_pos, hex_grid.hex_size)
+	building.setup(hive_data, coord, world_pos, hex_grid.get_effective_hex_size(coord))
 	buildings_container.add_child(building)
 	hex_grid.place_building(coord, building)
