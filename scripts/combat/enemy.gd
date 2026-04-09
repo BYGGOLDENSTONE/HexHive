@@ -1,85 +1,50 @@
 class_name Enemy
-extends Node2D
-## Runtime enemy entity. Moves toward the Hive, attacks obstacles in its path,
-## and opportunistically engages the hero or turrets that come into range.
+extends Node3D
+## Runtime enemy entity. Moves toward the Hive in 3D space, attacks obstacles,
+## and opportunistically engages the hero or turrets in range.
 
 const HealthScript = preload("res://scripts/combat/health.gd")
 
-## Emitted when the enemy dies (after death animation finishes).
 signal died_finished()
 
-## Enemy data resource (stats, visuals, tags).
 var data: Resource
-
-## Health component child.
 var health: HealthScript
-
-## Reference to the hex grid (set by spawner).
 var hex_grid: HexGrid
+var current_target: Node3D = null
 
-## Current target Node2D (Hive, wall, turret, or hero).
-var current_target: Node2D = null
-
-## Time until next retarget evaluation.
 var _retarget_timer: float = 0.0
-
-## Cooldown until next attack.
 var _attack_cooldown: float = 0.0
-
-## Time alive — used to delay AI start so the spawn animation can play.
 var _age: float = 0.0
-
-## Damage flash timer (>0 = currently flashing red).
 var _flash_timer: float = 0.0
-
-## True after death — disables AI and starts fade out.
 var _is_dying: bool = false
 
-## -- Sprite & hover state --
+## 3D model child.
+var _model: Node3D
 
-## Cached 8-direction texture sets, keyed by sprite_dir StringName.
-## Each value is a Dictionary[StringName, Texture2D] keyed by direction name.
-static var _TEXTURE_CACHE: Dictionary = {}
+## Base Y offset of the model after auto-centering.
+var _base_model_y: float = 0.0
 
-## Direction names indexed by 45-degree sector starting at East = 0.
-const DIRECTION_BY_SECTOR: Array[StringName] = [
-	&"e", &"se", &"s", &"sw", &"w", &"nw", &"n", &"ne",
-]
-
-## Sprite child node (created in _ready when sprite_dir is set).
-var _sprite: Sprite2D
-
-## Currently displayed facing direction.
-var _facing: StringName = &"s"
-
-## Hover animation phase (radians).
+## Hover animation.
 var _hover_time: float = 0.0
-
-## Hover bobbing frequency (rad/s).
 const HOVER_FREQUENCY: float = 5.5
+const HOVER_AMPLITUDE: float = 0.12
 
-## Hover amplitude in pixels (scaled by visual_size).
-const HOVER_AMPLITUDE_FACTOR: float = 0.18
+## Rotation smoothing.
+var _target_yaw: float = 0.0
+const ROTATION_SPEED: float = 10.0
 
-## Current axial coordinate (cached for retarget queries).
+## Current hex (cached for retarget queries).
 var _current_hex: Vector2i = Vector2i.ZERO
+var _hive_node: Node3D = null
 
-## Cached Hive node — found on first retarget.
-var _hive_node: Node2D = null
-
-## Hex distance at which the enemy notices opportunity threats.
 const OPPORTUNITY_HEX_RANGE: int = 1
-
-## Retarget interval in seconds.
 const RETARGET_INTERVAL: float = 0.35
 
 
-## Initialise the enemy with its data and the hex grid reference.
-func setup(enemy_data: Resource, grid: HexGrid, world_pos: Vector2) -> void:
+func setup(enemy_data: Resource, grid: HexGrid, world_pos: Vector3) -> void:
 	data = enemy_data
 	hex_grid = grid
 	position = world_pos
-	z_index = 5
 
 	health = HealthScript.new()
 	health.name = "Health"
@@ -88,79 +53,62 @@ func setup(enemy_data: Resource, grid: HexGrid, world_pos: Vector2) -> void:
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 
-	# Sprite is created here (not in _ready) because spawners call setup()
-	# AFTER add_child(), so data is already populated by this point.
-	_setup_sprite()
+	_load_model()
+
+
+func _load_model() -> void:
+	if data == null or data.model_path == "" or not ResourceLoader.exists(data.model_path):
+		return
+	var scene: PackedScene = load(data.model_path) as PackedScene
+	if scene == null:
+		return
+	_model = scene.instantiate()
+	_model.scale = Vector3.ONE * data.model_scale
+	add_child(_model)
+	HexHelper.auto_center_model(_model)
+	_base_model_y = _model.position.y
+
+	# Apply material tint if specified (e.g. hornet's crimson).
+	if data.material_tint != Color.WHITE:
+		_apply_material_tint(_model, data.material_tint)
+
+
+func _apply_material_tint(node: Node, tint: Color) -> void:
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		if mi.mesh:
+			for i in range(mi.mesh.get_surface_count()):
+				var orig: Material = mi.mesh.surface_get_material(i)
+				if orig is StandardMaterial3D:
+					var mat: StandardMaterial3D = (orig as StandardMaterial3D).duplicate()
+					mat.albedo_color = mat.albedo_color * tint
+					mi.set_surface_override_material(i, mat)
+	for child in node.get_children():
+		_apply_material_tint(child, tint)
 
 
 func _ready() -> void:
 	add_to_group(&"enemies")
-	# Spawn animation: pop in
-	scale = Vector2.ZERO
-	modulate.a = 0.0
+	# Spawn animation: scale from zero.
+	scale = Vector3.ZERO
 	var tw := create_tween()
-	tw.set_parallel(true)
 	tw.set_ease(Tween.EASE_OUT)
 	tw.set_trans(Tween.TRANS_BACK)
-	tw.tween_property(self, "scale", Vector2.ONE, 0.3)
-	tw.tween_property(self, "modulate:a", 1.0, 0.25)
-
-
-## Creates the directional Sprite2D child if the data has a sprite_dir set.
-## Loads (and caches) the 8-direction texture set on first use per sprite_dir.
-func _setup_sprite() -> void:
-	if data == null or data.sprite_dir == &"":
-		return
-	var textures: Dictionary = _get_or_load_textures(data.sprite_dir)
-	if textures.is_empty():
-		return
-	_sprite = Sprite2D.new()
-	_sprite.name = "Sprite"
-	_sprite.z_index = -1
-	_sprite.texture = textures[_facing]
-	# Scale so the sprite roughly spans visual_size * sprite_scale_factor pixels.
-	var tex_w: float = float(_sprite.texture.get_width())
-	if tex_w > 0.0:
-		var target_px: float = data.visual_size * 2.0 * data.sprite_scale_factor
-		var s: float = target_px / tex_w
-		_sprite.scale = Vector2(s, s)
-	add_child(_sprite)
-
-
-static func _get_or_load_textures(sprite_dir: StringName) -> Dictionary:
-	if _TEXTURE_CACHE.has(sprite_dir):
-		return _TEXTURE_CACHE[sprite_dir]
-	var dirs: Array[StringName] = [&"n", &"ne", &"e", &"se", &"s", &"sw", &"w", &"nw"]
-	var tex_set: Dictionary = {}
-	for d in dirs:
-		var path: String = "res://assets/sprites/%s/%s_%s.png" % [sprite_dir, sprite_dir, d]
-		if not ResourceLoader.exists(path):
-			push_warning("Enemy sprite missing: %s" % path)
-			continue
-		tex_set[d] = load(path)
-	if tex_set.is_empty():
-		return {}
-	_TEXTURE_CACHE[sprite_dir] = tex_set
-	return tex_set
+	tw.tween_property(self, "scale", Vector3.ONE, 0.3)
 
 
 func _process(delta: float) -> void:
 	if _flash_timer > 0.0:
 		_flash_timer = maxf(0.0, _flash_timer - delta)
 
-	# Hover bobbing — applied to sprite local position so the entity origin
-	# stays put for hex tracking and combat math.
 	_hover_time += delta * HOVER_FREQUENCY
-	if _sprite != null:
-		var amp: float = (data.visual_size if data != null else 18.0) * HOVER_AMPLITUDE_FACTOR
-		_sprite.position = Vector2(0.0, sin(_hover_time) * amp)
+	if _model:
+		_model.position.y = _base_model_y + sin(_hover_time) * HOVER_AMPLITUDE
 		if _flash_timer > 0.0:
 			var t: float = _flash_timer / 0.18
-			_sprite.modulate = Color(1.0, 1.0 - 0.55 * t, 1.0 - 0.55 * t, 1.0)
+			_set_flash_tint(Color(1.0, 1.0 - 0.55 * t, 1.0 - 0.55 * t))
 		else:
-			_sprite.modulate = Color(1.0, 1.0, 1.0, 1.0)
-
-	queue_redraw()
+			_clear_flash_tint()
 
 
 func _physics_process(delta: float) -> void:
@@ -178,74 +126,54 @@ func _physics_process(delta: float) -> void:
 	if current_target == null or not is_instance_valid(current_target):
 		return
 
-	var to_target: Vector2 = current_target.global_position - global_position
+	var to_target: Vector3 = current_target.global_position - global_position
+	to_target.y = 0.0
 	var dist: float = to_target.length()
 
 	if dist <= data.attack_range:
 		_try_attack(delta)
-		# Even when attacking, face the target.
 		if dist > 0.001:
-			_set_facing_from_vector(to_target / dist)
+			_target_yaw = atan2(to_target.x, to_target.z)
 	else:
-		var dir: Vector2 = to_target / dist if dist > 0.001 else Vector2.ZERO
+		var dir: Vector3 = to_target / dist if dist > 0.001 else Vector3.ZERO
 		position += dir * data.move_speed * delta
-		_set_facing_from_vector(dir)
+		# Update Y to match ground.
+		var hex: Vector2i = HexHelper.world3d_to_hex(position, hex_grid.hex_size)
+		var tile: HexTile = hex_grid.get_tile(hex)
+		if tile:
+			position.y = float(tile.elevation) * hex_grid.elevation_height
+		_target_yaw = atan2(dir.x, dir.z)
 		_update_hex_tracking()
 
-
-## Maps a direction vector to one of the 8 sprite directions and updates the
-## sprite texture if the facing actually changed.
-func _set_facing_from_vector(v: Vector2) -> void:
-	if _sprite == null or v.length_squared() < 0.0001:
-		return
-	var deg: float = rad_to_deg(v.angle())
-	deg = fposmod(deg, 360.0)
-	var sector: int = int(round(deg / 45.0)) % 8
-	var dir_name: StringName = DIRECTION_BY_SECTOR[sector]
-	if dir_name == _facing:
-		return
-	_facing = dir_name
-	var textures: Dictionary = _TEXTURE_CACHE.get(data.sprite_dir, {})
-	if textures.has(_facing):
-		_sprite.texture = textures[_facing]
+	if _model:
+		_model.rotation.y = lerp_angle(_model.rotation.y, _target_yaw, delta * ROTATION_SPEED)
 
 
 func _update_hex_tracking() -> void:
-	var hex: Vector2i = HexHelper.pixel_to_hex(position, hex_grid.hex_size)
+	var hex: Vector2i = HexHelper.world3d_to_hex(position, hex_grid.hex_size)
 	if hex != _current_hex:
 		_current_hex = hex
 
 
-# -- Targeting -----------------------------------------------------------------
+# -- Targeting --
 
 func _retarget() -> void:
 	if hex_grid == null:
 		return
-
-	# Cache the Hive once.
 	if _hive_node == null:
-		_hive_node = hex_grid.get_building_at(Vector2i.ZERO) as Node2D
+		_hive_node = hex_grid.get_building_at(Vector2i.ZERO) as Node3D
 
-	_current_hex = HexHelper.pixel_to_hex(position, hex_grid.hex_size)
+	_current_hex = HexHelper.world3d_to_hex(position, hex_grid.hex_size)
 
-	# 1) Opportunity threats — hero or any building within OPPORTUNITY_HEX_RANGE.
-	var best_threat: Node2D = null
-	var best_threat_dist: float = INF
-
-	var hero: Node2D = _get_hero()
+	# 1) Opportunity threats.
+	var hero: Node3D = _get_hero()
 	if hero != null and not _hero_is_dead(hero):
-		var hero_hex: Vector2i = HexHelper.pixel_to_hex(hero.global_position, hex_grid.hex_size)
+		var hero_hex: Vector2i = HexHelper.world3d_to_hex(hero.global_position, hex_grid.hex_size)
 		if HexHelper.distance(_current_hex, hero_hex) <= OPPORTUNITY_HEX_RANGE:
-			var d: float = global_position.distance_to(hero.global_position)
-			if d < best_threat_dist:
-				best_threat_dist = d
-				best_threat = hero
+			current_target = hero
+			return
 
-	if best_threat != null:
-		current_target = best_threat
-		return
-
-	# 2) Obstacle directly in path to the Hive.
+	# 2) Obstacle in path to Hive.
 	var path: Array[Vector2i] = HexHelper.get_line(_current_hex, Vector2i.ZERO)
 	for hex in path:
 		if hex == _current_hex:
@@ -254,31 +182,31 @@ func _retarget() -> void:
 		if tile == null:
 			continue
 		if tile.has_building and tile.building != null:
-			current_target = tile.building as Node2D
+			current_target = tile.building as Node3D
 			return
 
-	# 3) Default — head straight for the Hive.
+	# 3) Default — Hive.
 	if _hive_node != null and is_instance_valid(_hive_node):
 		current_target = _hive_node
 
 
-func _get_hero() -> Node2D:
+func _get_hero() -> Node3D:
 	var tree := get_tree()
 	if tree == null:
 		return null
 	var nodes: Array = tree.get_nodes_in_group(&"hero")
 	if nodes.size() > 0:
-		return nodes[0] as Node2D
+		return nodes[0] as Node3D
 	return null
 
 
-func _hero_is_dead(hero: Node2D) -> bool:
+func _hero_is_dead(hero: Node3D) -> bool:
 	if hero.has_method("is_alive"):
 		return not hero.is_alive()
 	return false
 
 
-# -- Combat --------------------------------------------------------------------
+# -- Combat --
 
 func _try_attack(delta: float) -> void:
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
@@ -291,7 +219,6 @@ func _try_attack(delta: float) -> void:
 		_attack_cooldown = 1.0 / maxf(data.attack_speed, 0.01)
 
 
-## Public damage entry-point used by hero/turret projectiles.
 func take_damage(amount: float) -> void:
 	if health == null:
 		return
@@ -313,40 +240,54 @@ func _on_died() -> void:
 
 func _play_death() -> void:
 	var tw := create_tween()
-	tw.set_parallel(true)
 	tw.set_ease(Tween.EASE_OUT)
 	tw.set_trans(Tween.TRANS_CUBIC)
-	tw.tween_property(self, "scale", Vector2(1.4, 1.4), 0.18)
-	tw.tween_property(self, "modulate:a", 0.0, 0.28)
-	tw.tween_property(self, "rotation", randf_range(-0.6, 0.6), 0.28)
+	tw.tween_property(self, "scale", Vector3(1.4, 1.4, 1.4), 0.18)
 	await tw.finished
 	died_finished.emit()
 	queue_free()
 
 
-## Used by hero/turrets to know whether to shoot at this enemy.
 func is_alive() -> bool:
 	return not _is_dying and health != null and not health.is_dead
 
 
-# -- Drawing -------------------------------------------------------------------
+# -- Flash tinting --
 
-func _draw() -> void:
-	if data == null:
+var _flash_overrides: Array[Dictionary] = []
+
+func _set_flash_tint(color: Color) -> void:
+	if _model == null:
 		return
-	# Body is rendered by the directional Sprite2D child. Only the HP bar is
-	# drawn here so it stays at a fixed position above the bobbing sprite.
-	if health and health.current_hp < health.max_hp and not _is_dying:
-		_draw_health_bar(data.visual_size)
+	_traverse_flash(_model, color)
 
 
-func _draw_health_bar(size: float) -> void:
-	var width: float = size * 2.0
-	var height: float = 4.0
-	# Place the bar above the sprite (sprite spans ~size * sprite_scale_factor).
-	var y: float = -size * (data.sprite_scale_factor + 0.2)
-	var bg_rect := Rect2(-width / 2.0, y, width, height)
-	draw_rect(bg_rect, Color(0.05, 0.05, 0.05, 0.85))
-	var frac: float = health.get_fraction()
-	var fill_rect := Rect2(-width / 2.0 + 1.0, y + 1.0, (width - 2.0) * frac, height - 2.0)
-	draw_rect(fill_rect, Color(0.95, 0.25, 0.2, 1.0))
+func _clear_flash_tint() -> void:
+	if _model == null:
+		return
+	_traverse_clear_flash(_model)
+
+
+func _traverse_flash(node: Node, color: Color) -> void:
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		if mi.mesh:
+			for i in range(mi.mesh.get_surface_count()):
+				var mat: Material = mi.get_surface_override_material(i)
+				if mat is StandardMaterial3D:
+					(mat as StandardMaterial3D).emission = color * 0.5
+					(mat as StandardMaterial3D).emission_enabled = true
+	for child in node.get_children():
+		_traverse_flash(child, color)
+
+
+func _traverse_clear_flash(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		if mi.mesh:
+			for i in range(mi.mesh.get_surface_count()):
+				var mat: Material = mi.get_surface_override_material(i)
+				if mat is StandardMaterial3D:
+					(mat as StandardMaterial3D).emission_enabled = false
+	for child in node.get_children():
+		_traverse_clear_flash(child)

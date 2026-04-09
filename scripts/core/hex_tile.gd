@@ -14,7 +14,7 @@ enum TerrainType {
 ## Axial coordinate of this tile
 var coord: Vector2i
 
-## Pixel position of the tile center (cached for performance)
+## Pixel position of the tile center (XZ plane projection, cached for math).
 var pixel_center: Vector2
 
 ## Terrain type
@@ -47,6 +47,12 @@ var slot_entities: Array = [null, null, null, null, null, null, null]
 func _init(q: int, r: int, hex_size: float) -> void:
 	coord = Vector2i(q, r)
 	pixel_center = HexHelper.axial_to_pixel(coord, hex_size)
+
+
+## Get the 3D world position of this tile's center.
+## elevation_height = world units per elevation level.
+func get_world_center(elevation_height: float = 1.0) -> Vector3:
+	return Vector3(pixel_center.x, float(elevation) * elevation_height, pixel_center.y)
 
 
 ## Returns the number of occupied slots.

@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://diphnf8wr7xpu"
+path="res://.godot/imported/hex_ramp_edge.obj-5a08e2c1532d0cf5b350781b9053550e.mesh"
+
+[deps]
+
+files=["res://.godot/imported/hex_ramp_edge.obj-5a08e2c1532d0cf5b350781b9053550e.mesh"]
+
+source_file="res://assets/models/tiles/ramps/hex_ramp_edge.obj"
+dest_files=["res://.godot/imported/hex_ramp_edge.obj-5a08e2c1532d0cf5b350781b9053550e.mesh", "res://.godot/imported/hex_ramp_edge.obj-5a08e2c1532d0cf5b350781b9053550e.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

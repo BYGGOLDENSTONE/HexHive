@@ -1,24 +1,28 @@
 class_name HexGrid
-extends Node2D
+extends Node3D
 ## Manages the hex tile map. Creates, stores, and queries pointy-top hex tiles.
+## Hex grid lives on the XZ plane; Y axis is used for elevation.
 
 signal tile_hovered(coord: Vector2i)
 signal tile_unhovered()
 signal tile_clicked(coord: Vector2i)
 
-## Hex outer radius in pixels (center to vertex)
-@export var hex_size: float = 48.0
+## Hex outer radius in world units (center to vertex).
+@export var hex_size: float = 1.0
 
-## Map radius in hexes (produces a hex-shaped map)
+## Map radius in hexes (produces a hex-shaped map).
 @export var map_radius: int = 20
 
-## Radius for inner unit slot positioning (computed from hex_size for perfect fit)
+## World units per elevation level.
+@export var elevation_height: float = 1.0
+
+## Radius for inner unit slot positioning (computed from hex_size for perfect fit).
 var slot_radius: float
 
-## All tiles indexed by axial coordinate
+## All tiles indexed by axial coordinate.
 var tiles: Dictionary = {}  # Dictionary[Vector2i, HexTile]
 
-## Currently hovered tile coordinate (or null)
+## Currently hovered tile coordinate (or null).
 var hovered_coord: Variant = null
 
 
@@ -42,25 +46,20 @@ func _setup_elevation() -> void:
 	var island_radius: int = 3
 	var center: Vector2i = Vector2i.ZERO
 
-	# Ramp positions (border hexes) and their exit directions toward LOW ground
-	# (0, 3)  = south ramp  → exit toward SE direction index 5 which is (0,1) → (0,4)
-	# (-3, 0) = west ramp   → exit toward W  direction index 3 which is (-1,0) → (-4,0)
 	var ramp_configs: Array = [
-		{"coord": Vector2i(0, 3),  "exit_dir": 5},   # south, exits SE toward (0,4)
-		{"coord": Vector2i(-3, 0), "exit_dir": 3},    # west, exits W toward (-4,0)
+		{"coord": Vector2i(0, 3),  "exit_dir": 5},
+		{"coord": Vector2i(-3, 0), "exit_dir": 3},
 	]
 	var ramp_coords: Array[Vector2i] = []
 	for cfg in ramp_configs:
 		ramp_coords.append(cfg["coord"] as Vector2i)
 
-	# Mark island hexes as elevated
 	for coord_key: Vector2i in tiles:
 		var dist: int = HexHelper.distance(center, coord_key)
 		if dist <= island_radius:
 			var tile: HexTile = tiles[coord_key]
 			tile.elevation = 1
 
-	# Mark ramp tiles
 	for cfg in ramp_configs:
 		var ramp_coord: Vector2i = cfg["coord"] as Vector2i
 		var tile: HexTile = get_tile(ramp_coord)
@@ -74,30 +73,25 @@ func get_tile(coord: Vector2i) -> HexTile:
 	return tiles.get(coord) as HexTile
 
 
-## Get the effective hex size for a tile, accounting for elevation.
-## Elevated tiles get a slight scale boost to appear more dominant.
-func get_effective_hex_size(coord: Vector2i) -> float:
-	var tile: HexTile = get_tile(coord)
-	if tile and tile.elevation > 0:
-		return hex_size * 1.1
-	return hex_size
-
-
 ## Check if a coordinate is within the map.
 func has_tile(coord: Vector2i) -> bool:
 	return tiles.has(coord)
 
 
-## Convert a world pixel position to the hex coordinate it falls in.
-func world_to_hex(world_pos: Vector2) -> Vector2i:
-	var local_pos: Vector2 = to_local(world_pos)
-	return HexHelper.pixel_to_hex(local_pos, hex_size)
+## Convert a 3D world position to the hex coordinate it falls in (ignores Y).
+func world_to_hex(world_pos: Vector3) -> Vector2i:
+	var local_pos: Vector3 = world_pos - global_position
+	return HexHelper.pixel_to_hex(Vector2(local_pos.x, local_pos.z), hex_size)
 
 
-## Convert a hex coordinate to its world pixel position.
-func hex_to_world(coord: Vector2i) -> Vector2:
-	var local_pos: Vector2 = HexHelper.axial_to_pixel(coord, hex_size)
-	return to_global(local_pos)
+## Convert a hex coordinate to its 3D world position (with elevation Y).
+func hex_to_world(coord: Vector2i) -> Vector3:
+	var pixel: Vector2 = HexHelper.axial_to_pixel(coord, hex_size)
+	var tile: HexTile = get_tile(coord)
+	var y: float = 0.0
+	if tile:
+		y = float(tile.elevation) * elevation_height
+	return Vector3(pixel.x, y, pixel.y) + global_position
 
 
 ## Get the walkable neighbors of a hex (tiles that exist and are walkable).
@@ -108,11 +102,6 @@ func get_walkable_neighbors(coord: Vector2i) -> Array[Vector2i]:
 		if tile and tile.is_walkable():
 			result.append(neighbor)
 	return result
-
-
-## Get the pixel positions of all 7 inner slots for a tile.
-func get_tile_slot_positions(coord: Vector2i) -> Array[Vector2]:
-	return HexHelper.get_slot_positions(coord, hex_size, slot_radius)
 
 
 ## Get all tiles of a specific terrain type.
@@ -130,7 +119,7 @@ func get_tile_count() -> int:
 
 
 ## Place a building on a tile. Returns true if successful.
-func place_building(coord: Vector2i, building_node: Node2D) -> bool:
+func place_building(coord: Vector2i, building_node: Node3D) -> bool:
 	var tile := get_tile(coord)
 	if tile == null or tile.has_building:
 		return false
@@ -164,8 +153,6 @@ func can_place_building(coord: Vector2i, building_data: Resource) -> bool:
 		return false
 	if int(tile.terrain) not in building_data.buildable_on:
 		return false
-	# Refuse the hero's current hex — placing a building there would trap the hero
-	# inside a non-walkable cell.
 	var hero: Node = get_tree().get_first_node_in_group(&"hero")
 	if hero != null and "current_hex" in hero and (hero.current_hex as Vector2i) == coord:
 		return false
@@ -181,15 +168,7 @@ func get_all_building_coords() -> Array[Vector2i]:
 	return result
 
 
-## Find a path from start to goal across walkable tiles using A*.
-##
-## - Returns an Array[Vector2i] of coordinates from start (inclusive) to the
-##   reached destination (inclusive). Empty array if no path exists.
-## - If `goal` itself is unwalkable (e.g. a hex where a building will be placed),
-##   the search succeeds when any walkable tile within `goal_range` of `goal` is
-##   reached. This lets the hero path adjacent to a build target without trying
-##   to step into it.
-## - `start` must be walkable; if not, returns an empty array.
+## A* pathfinding across walkable tiles.
 func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Vector2i]:
 	var empty: Array[Vector2i] = []
 	var start_tile: HexTile = get_tile(start)
@@ -198,14 +177,12 @@ func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Ve
 	if HexHelper.distance(start, goal) <= goal_range:
 		return [start] as Array[Vector2i]
 
-	# Standard A* on the hex grid. f = g + h where h is hex distance to goal.
 	var open_set: Array[Vector2i] = [start]
-	var came_from: Dictionary = {}        # Vector2i -> Vector2i
-	var g_score: Dictionary = {start: 0}  # Vector2i -> int
+	var came_from: Dictionary = {}
+	var g_score: Dictionary = {start: 0}
 	var f_score: Dictionary = {start: HexHelper.distance(start, goal)}
 
 	while not open_set.is_empty():
-		# Pick node in open_set with the lowest f_score.
 		var current: Vector2i = open_set[0]
 		var current_idx: int = 0
 		for i in range(1, open_set.size()):
@@ -230,7 +207,6 @@ func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Ve
 	return empty
 
 
-## Walk the came_from chain backwards to reconstruct the path.
 func _reconstruct_path(came_from: Dictionary, end: Vector2i) -> Array[Vector2i]:
 	var path: Array[Vector2i] = [end]
 	var current: Vector2i = end
@@ -238,3 +214,20 @@ func _reconstruct_path(came_from: Dictionary, end: Vector2i) -> Array[Vector2i]:
 		current = came_from[current]
 		path.push_front(current)
 	return path
+
+
+## Project a screen-space mouse position to the ground plane via camera ray.
+## Returns the XZ world position at Y = target_y.
+func get_mouse_world_position(target_y: float = 0.0) -> Vector3:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera == null:
+		return Vector3.ZERO
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	var ray_origin: Vector3 = camera.project_ray_origin(mouse_pos)
+	var ray_dir: Vector3 = camera.project_ray_normal(mouse_pos)
+	if absf(ray_dir.y) < 0.0001:
+		return Vector3.ZERO
+	var t: float = (target_y - ray_origin.y) / ray_dir.y
+	if t < 0.0:
+		return Vector3.ZERO
+	return ray_origin + ray_dir * t

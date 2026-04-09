@@ -1,5 +1,5 @@
 extends Resource
-## Defines a building type with its properties, tags, and visual data.
+## Defines a building type with its properties, tags, and 3D model data.
 ## Each building type is a .tres file in resources/buildings/.
 
 ## Unique identifier for this building type.
@@ -27,12 +27,6 @@ extends Resource
 ## Whether the player can build this (false for Hive which is pre-placed).
 @export var player_buildable: bool = true
 
-## Base color for procedural rendering (per level, index 0 = level 1).
-@export var level_colors: Array[Color] = []
-
-## Accent color for procedural rendering (per level).
-@export var level_accent_colors: Array[Color] = []
-
 # -- Combat stats (per level) --
 
 ## Max HP per upgrade level (length should match max_level).
@@ -41,25 +35,31 @@ extends Resource
 ## Damage per attack per level (0 = does not attack).
 @export var attack_damage_per_level: Array[float] = [0.0]
 
-## Attack range in pixels per level.
+## Attack range in world units per level.
 @export var attack_range_per_level: Array[float] = [0.0]
 
 ## Attacks per second per level.
 @export var attack_speed_per_level: Array[float] = [0.0]
 
-## True if this building can be destroyed (false for invulnerable special buildings, currently unused).
+## True if this building can be destroyed.
 @export var destructible: bool = true
 
-# -- Sprite (optional, replaces procedural _draw body) --
+# -- 3D Model --
 
-## Texture path for the static sprite. Empty = use procedural draw.
+## Path to the GLB model scene. Empty = use procedural placeholder.
+@export var model_path: String = ""
+
+## Scale multiplier for the 3D model.
+@export var model_scale: Vector3 = Vector3.ONE
+
+## Vertical offset for the model (positive = up).
+@export var model_y_offset: float = 0.0
+
+# -- Legacy 2D fields (kept for .tres compat, ignored at runtime) --
+@export var level_colors: Array[Color] = []
+@export var level_accent_colors: Array[Color] = []
 @export var sprite_path: String = ""
-
-## Scale multiplier relative to hex tile width. (1,1) = sprite width matches
-## one hex tile width, height proportional. Adjust independently for stretch.
 @export var sprite_scale: Vector2 = Vector2(1.0, 1.0)
-
-## Pixel offset from hex center. (0,0) = centered. Negative Y = up.
 @export var sprite_offset: Vector2 = Vector2(0.0, 0.0)
 
 
@@ -79,7 +79,7 @@ func get_attack_damage(level: int) -> float:
 	return attack_damage_per_level[idx]
 
 
-## Get attack range (pixels) for a level.
+## Get attack range (world units) for a level.
 func get_attack_range(level: int) -> float:
 	if attack_range_per_level.is_empty():
 		return 0.0

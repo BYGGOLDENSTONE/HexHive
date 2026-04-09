@@ -180,3 +180,66 @@ static func get_flat_hex_corners(center: Vector2, size: float) -> PackedVector2A
 		var angle_rad: float = deg_to_rad(angle_deg)
 		corners.append(center + Vector2(cos(angle_rad), sin(angle_rad)) * size)
 	return corners
+
+
+# -- 3D Coordinate Conversions --
+
+## Convert axial hex coordinate to 3D world position.
+## Maps pixel X → world X, pixel Y → world Z, elevation → world Y.
+static func axial_to_world3d(hex: Vector2i, hex_size: float, elevation_y: float = 0.0) -> Vector3:
+	var p: Vector2 = axial_to_pixel(hex, hex_size)
+	return Vector3(p.x, elevation_y, p.y)
+
+
+## Convert a 3D world position to the nearest hex coordinate (ignores Y).
+static func world3d_to_hex(world_pos: Vector3, hex_size: float) -> Vector2i:
+	return pixel_to_hex(Vector2(world_pos.x, world_pos.z), hex_size)
+
+
+## Horizontal (XZ-plane) distance between two 3D points, ignoring Y.
+static func xz_distance(a: Vector3, b: Vector3) -> float:
+	var dx: float = a.x - b.x
+	var dz: float = a.z - b.z
+	return sqrt(dx * dx + dz * dz)
+
+
+## Auto-center a 3D model instance so its XZ center is at the parent's origin
+## and its bottom sits at Y=0. Used to fix Asset Forge origin offsets.
+static func auto_center_model(instance: Node3D) -> void:
+	var aabb: AABB = _compute_combined_aabb(instance, instance)
+	if aabb.size == Vector3.ZERO:
+		return
+	var center: Vector3 = aabb.get_center()
+	instance.position = Vector3(-center.x, -aabb.position.y, -center.z)
+
+
+## Compute the combined AABB of all MeshInstance3D descendants in local space.
+static func _compute_combined_aabb(node: Node, root: Node3D) -> AABB:
+	var result := AABB()
+	var first := true
+	if node is MeshInstance3D:
+		var mi := node as MeshInstance3D
+		if mi.mesh:
+			var mesh_aabb: AABB = mi.mesh.get_aabb()
+			# Transform to root space
+			var xform: Transform3D = Transform3D.IDENTITY
+			var current: Node = mi
+			while current != root and current != null:
+				if current is Node3D:
+					xform = (current as Node3D).transform * xform
+				current = current.get_parent()
+			mesh_aabb = xform * mesh_aabb
+			if first:
+				result = mesh_aabb
+				first = false
+			else:
+				result = result.merge(mesh_aabb)
+	for child in node.get_children():
+		var child_aabb: AABB = _compute_combined_aabb(child, root)
+		if child_aabb.size != Vector3.ZERO:
+			if first:
+				result = child_aabb
+				first = false
+			else:
+				result = result.merge(child_aabb)
+	return result
