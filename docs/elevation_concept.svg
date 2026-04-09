@@ -1,0 +1,361 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 540" width="720" height="540">
+  <defs>
+    <!-- Cliff face gradient (top = lighter rock, bottom = dark earth) -->
+    <linearGradient id="cliff" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9b7d55"/>
+      <stop offset="40%" stop-color="#7a6040"/>
+      <stop offset="100%" stop-color="#4a3820"/>
+    </linearGradient>
+    <!-- Ramp gradient (high green to low green) -->
+    <linearGradient id="ramp" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5eaa4f"/>
+      <stop offset="100%" stop-color="#3a6432"/>
+    </linearGradient>
+    <!-- Shadow gradient -->
+    <linearGradient id="cliff-shadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Tower glow -->
+    <radialGradient id="tower-glow">
+      <stop offset="0%" stop-color="#ffcc33" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ffcc33" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Range arc gradient -->
+    <radialGradient id="range-glow" cx="50%" cy="0%" r="100%">
+      <stop offset="0%" stop-color="#ffdd55" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffdd55" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ============ BACKGROUND ============ -->
+  <rect width="720" height="540" fill="#141e10"/>
+
+  <!-- Subtle background hex grid pattern (atmosphere) -->
+  <g opacity="0.04" stroke="#88aa66" stroke-width="0.5" fill="none">
+    <polygon points="60,20 85,34 85,62 60,76 35,62 35,34"/>
+    <polygon points="133,20 158,34 158,62 133,76 108,62 108,34"/>
+    <polygon points="530,20 555,34 555,62 530,76 505,62 505,34"/>
+    <polygon points="603,20 628,34 628,62 603,76 578,62 578,34"/>
+    <polygon points="60,440 85,454 85,482 60,496 35,482 35,454"/>
+    <polygon points="603,440 628,454 628,482 603,496 578,482 578,454"/>
+  </g>
+
+  <!-- ============ LOW GROUND SHADOW (cast from cliff) ============ -->
+  <rect x="155" y="255" width="310" height="35" fill="url(#cliff-shadow)"/>
+
+  <!-- ============ LOW GROUND HEXES ============ -->
+  <g id="low-ground">
+    <!-- Row C: y=296 -->
+    <polygon points="200,254 236.37,275 236.37,317 200,338 163.63,317 163.63,275"
+             fill="#3a6432" stroke="#2b4d25" stroke-width="1.8"/>
+    <polygon points="273,254 309.37,275 309.37,317 273,338 236.63,317 236.63,275"
+             fill="#3d6835" stroke="#2b4d25" stroke-width="1.8"/>
+    <polygon points="346,254 382.37,275 382.37,317 346,338 309.63,317 309.63,275"
+             fill="#3a6432" stroke="#2b4d25" stroke-width="1.8"/>
+    <polygon points="419,254 455.37,275 455.37,317 419,338 382.63,317 382.63,275"
+             fill="#3d6835" stroke="#2b4d25" stroke-width="1.8"/>
+    <!-- Row D: y=356 -->
+    <polygon points="236,314 272.37,335 272.37,377 236,398 199.63,377 199.63,335"
+             fill="#3d6835" stroke="#2b4d25" stroke-width="1.8"/>
+    <polygon points="309,314 345.37,335 345.37,377 309,398 272.63,377 272.63,335"
+             fill="#3a6432" stroke="#2b4d25" stroke-width="1.8"/>
+    <polygon points="382,314 418.37,335 418.37,377 382,398 345.63,377 345.63,335"
+             fill="#3d6835" stroke="#2b4d25" stroke-width="1.8"/>
+    <!-- Row E: y=416 -->
+    <polygon points="273,374 309.37,395 309.37,437 273,458 236.63,437 236.63,395"
+             fill="#3a6432" stroke="#2b4d25" stroke-width="1.8"/>
+    <polygon points="346,374 382.37,395 382.37,437 346,458 309.63,437 309.63,395"
+             fill="#3d6835" stroke="#2b4d25" stroke-width="1.8"/>
+  </g>
+
+  <!-- Low ground grass tufts (small decorative marks) -->
+  <g stroke="#4a7a42" stroke-width="1" stroke-linecap="round" opacity="0.5">
+    <line x1="195" y1="290" x2="198" y2="284"/>
+    <line x1="202" y1="292" x2="206" y2="286"/>
+    <line x1="340" y1="305" x2="344" y2="299"/>
+    <line x1="270" y1="350" x2="274" y2="344"/>
+    <line x1="380" y1="352" x2="384" y2="346"/>
+    <line x1="305" y1="360" x2="309" y2="354"/>
+    <line x1="345" y1="420" x2="349" y2="414"/>
+    <line x1="275" y1="410" x2="279" y2="404"/>
+  </g>
+
+  <!-- ============ CLIFF FACE ============ -->
+  <!-- Left cliff section (below H4, extends to far left) -->
+  <polygon points="163.63,161 199.63,161 236,182 272.37,161 272.37,255 163.63,255"
+           fill="url(#cliff)"/>
+  <!-- Right cliff section (below H6, extends to far right) -->
+  <polygon points="345.63,161 382,182 418.37,161 455.37,161 455.37,255 345.63,255"
+           fill="url(#cliff)"/>
+  <!-- Far-left cliff edge (below H0 overhang) -->
+  <polygon points="163.63,101 163.63,255 155,255 155,108"
+           fill="#5a4530" opacity="0.7"/>
+  <!-- Far-right cliff edge (below H3 overhang) -->
+  <polygon points="455.37,101 455.37,255 463,255 463,108"
+           fill="#5a4530" opacity="0.7"/>
+
+  <!-- Cliff face stone texture lines -->
+  <g stroke="#5a4530" stroke-width="0.8" opacity="0.6">
+    <line x1="170" y1="185" x2="265" y2="185"/>
+    <line x1="175" y1="205" x2="255" y2="205"/>
+    <line x1="168" y1="225" x2="270" y2="225"/>
+    <line x1="172" y1="240" x2="260" y2="240"/>
+    <line x1="350" y1="185" x2="450" y2="185"/>
+    <line x1="355" y1="205" x2="445" y2="205"/>
+    <line x1="348" y1="225" x2="452" y2="225"/>
+    <line x1="352" y1="240" x2="448" y2="240"/>
+  </g>
+  <!-- Cliff stone block divisions -->
+  <g stroke="#5a4530" stroke-width="0.6" opacity="0.4">
+    <line x1="210" y1="161" x2="210" y2="255"/>
+    <line x1="245" y1="175" x2="245" y2="255"/>
+    <line x1="380" y1="175" x2="380" y2="255"/>
+    <line x1="415" y1="161" x2="415" y2="255"/>
+  </g>
+
+  <!-- Cliff top edge highlight -->
+  <g stroke="#b09060" stroke-width="1.5" fill="none" opacity="0.6">
+    <polyline points="163.63,161 199.63,161 236,182 272.37,161"/>
+    <polyline points="345.63,161 382,182 418.37,161 455.37,161"/>
+  </g>
+
+  <!-- Cliff "X" marks (not passable) -->
+  <g stroke="#cc3333" stroke-width="2.5" stroke-linecap="round" opacity="0.7">
+    <line x1="210" y1="198" x2="225" y2="218"/>
+    <line x1="225" y1="198" x2="210" y2="218"/>
+    <line x1="390" y1="198" x2="405" y2="218"/>
+    <line x1="405" y1="198" x2="390" y2="218"/>
+  </g>
+
+  <!-- ============ RAMP ============ -->
+  <polygon points="309,176 345.37,197 345.37,239 309,260 272.63,239 272.63,197"
+           fill="url(#ramp)" stroke="#5a8a4a" stroke-width="2"/>
+  <!-- Ramp slope chevrons (showing direction) -->
+  <g stroke="#2d5028" stroke-width="1.5" fill="none" opacity="0.5" stroke-linecap="round">
+    <polyline points="295,198 309,192 323,198"/>
+    <polyline points="290,212 309,204 328,212"/>
+    <polyline points="285,226 309,218 333,226"/>
+    <polyline points="288,240 309,232 330,240"/>
+  </g>
+  <!-- Ramp walkable arrow -->
+  <g fill="#66cc55" opacity="0.6">
+    <polygon points="309,183 316,195 302,195"/>
+    <polygon points="309,249 316,237 302,237"/>
+  </g>
+
+  <!-- ============ HIGH GROUND HEXES ============ -->
+  <g id="high-ground">
+    <!-- Row A: y=80 (elevated) -->
+    <polygon points="200,38 236.37,59 236.37,101 200,122 163.63,101 163.63,59"
+             fill="#5eaa4f" stroke="#478c39" stroke-width="2"/>
+    <polygon points="273,38 309.37,59 309.37,101 273,122 236.63,101 236.63,59"
+             fill="#62b053" stroke="#478c39" stroke-width="2"/>
+    <polygon points="346,38 382.37,59 382.37,101 346,122 309.63,101 309.63,59"
+             fill="#5eaa4f" stroke="#478c39" stroke-width="2"/>
+    <polygon points="419,38 455.37,59 455.37,101 419,122 382.63,101 382.63,59"
+             fill="#62b053" stroke="#478c39" stroke-width="2"/>
+    <!-- Row B: y=140 (elevated) -->
+    <polygon points="236,98 272.37,119 272.37,161 236,182 199.63,161 199.63,119"
+             fill="#62b053" stroke="#478c39" stroke-width="2"/>
+    <polygon points="309,98 345.37,119 345.37,161 309,182 272.63,161 272.63,119"
+             fill="#5eaa4f" stroke="#478c39" stroke-width="2"/>
+    <polygon points="382,98 418.37,119 418.37,161 382,182 345.63,161 345.63,119"
+             fill="#62b053" stroke="#478c39" stroke-width="2"/>
+  </g>
+
+  <!-- High ground grass tufts -->
+  <g stroke="#75c865" stroke-width="1" stroke-linecap="round" opacity="0.5">
+    <line x1="195" y1="75" x2="199" y2="68"/>
+    <line x1="205" y1="78" x2="209" y2="71"/>
+    <line x1="340" y1="72" x2="344" y2="65"/>
+    <line x1="415" y1="78" x2="419" y2="71"/>
+    <line x1="232" y1="135" x2="236" y2="128"/>
+    <line x1="378" y1="135" x2="382" y2="128"/>
+    <line x1="270" y1="75" x2="274" y2="68"/>
+  </g>
+
+  <!-- High ground sunlight highlight (subtle) -->
+  <g opacity="0.08">
+    <polygon points="200,38 236.37,59 236.37,80 200,80 163.63,80 163.63,59" fill="#ffffff"/>
+    <polygon points="273,38 309.37,59 309.37,80 273,80 236.63,80 236.63,59" fill="#ffffff"/>
+    <polygon points="346,38 382.37,59 382.37,80 346,80 309.63,80 309.63,59" fill="#ffffff"/>
+    <polygon points="419,38 455.37,59 455.37,80 419,80 382.63,80 382.63,59" fill="#ffffff"/>
+  </g>
+
+  <!-- ============ TOWER (on high ground H5) ============ -->
+  <!-- Tower glow -->
+  <circle cx="309" cy="130" r="45" fill="url(#tower-glow)"/>
+  <!-- Tower base -->
+  <polygon points="309,114 323,121 323,139 309,146 295,139 295,121"
+           fill="#c8952a" stroke="#a07520" stroke-width="1.5"/>
+  <!-- Tower upper body -->
+  <rect x="302" y="104" width="14" height="18" rx="1" fill="#daa830" stroke="#a07520" stroke-width="1"/>
+  <!-- Tower top (pointed roof) -->
+  <polygon points="309,94 318,104 300,104" fill="#e8be40" stroke="#a07520" stroke-width="1"/>
+  <!-- Tower window -->
+  <rect x="306" y="108" width="6" height="5" rx="0.5" fill="#3a2510" opacity="0.7"/>
+  <!-- Tower range indicator arc -->
+  <ellipse cx="309" cy="140" rx="130" ry="160" fill="none" stroke="#ffdd55" stroke-width="1"
+           stroke-dasharray="4,6" opacity="0.25"/>
+  <!-- Range arc fill -->
+  <ellipse cx="309" cy="140" rx="130" ry="160" fill="url(#range-glow)"/>
+
+  <!-- ============ ENEMIES (on low ground) ============ -->
+  <!-- Enemy 1: approaching ramp -->
+  <g transform="translate(309, 345)">
+    <circle r="10" fill="#cc3333" stroke="#992222" stroke-width="1.5"/>
+    <circle r="4" fill="#ff6655"/>
+    <!-- Small wings -->
+    <ellipse cx="-7" cy="-4" rx="5" ry="3" fill="#cc3333" opacity="0.6" transform="rotate(-20)"/>
+    <ellipse cx="7" cy="-4" rx="5" ry="3" fill="#cc3333" opacity="0.6" transform="rotate(20)"/>
+  </g>
+  <!-- Enemy 2 -->
+  <g transform="translate(270, 370)">
+    <circle r="8" fill="#cc3333" stroke="#992222" stroke-width="1.5"/>
+    <circle r="3" fill="#ff6655"/>
+    <ellipse cx="-6" cy="-3" rx="4" ry="2.5" fill="#cc3333" opacity="0.6"/>
+    <ellipse cx="6" cy="-3" rx="4" ry="2.5" fill="#cc3333" opacity="0.6"/>
+  </g>
+  <!-- Enemy 3 -->
+  <g transform="translate(348, 380)">
+    <circle r="8" fill="#cc3333" stroke="#992222" stroke-width="1.5"/>
+    <circle r="3" fill="#ff6655"/>
+    <ellipse cx="-6" cy="-3" rx="4" ry="2.5" fill="#cc3333" opacity="0.6"/>
+    <ellipse cx="6" cy="-3" rx="4" ry="2.5" fill="#cc3333" opacity="0.6"/>
+  </g>
+
+  <!-- Enemy path arrow (approaching ramp) -->
+  <g stroke="#cc4444" stroke-width="1.5" fill="none" opacity="0.5" stroke-dasharray="4,4">
+    <path d="M309,332 L309,270"/>
+  </g>
+  <polygon points="309,267 314,277 304,277" fill="#cc4444" opacity="0.5"/>
+
+  <!-- ============ RANGE ADVANTAGE ARROW ============ -->
+  <!-- Arrow from tower to enemies -->
+  <line x1="325" y1="150" x2="345" y2="320" stroke="#ffcc33" stroke-width="1.5"
+        stroke-dasharray="6,4" opacity="0.5"/>
+  <polygon points="345,323 340,313 350,313" fill="#ffcc33" opacity="0.5"/>
+
+  <!-- ============ LABELS ============ -->
+  <!-- Title -->
+  <text x="360" y="22" text-anchor="middle" fill="#c8a840" font-family="sans-serif"
+        font-size="16" font-weight="bold" letter-spacing="2">ELEVATION SISTEMI</text>
+
+  <!-- High ground label -->
+  <g transform="translate(548, 72)">
+    <rect x="-62" y="-14" width="124" height="22" rx="4" fill="#2a4422" opacity="0.9"/>
+    <text text-anchor="middle" fill="#88dd66" font-family="sans-serif" font-size="12"
+          font-weight="bold" dy="3">YUKSEK ZEMIN</text>
+  </g>
+
+  <!-- Low ground label -->
+  <g transform="translate(548, 340)">
+    <rect x="-56" y="-14" width="112" height="22" rx="4" fill="#1a2e15" opacity="0.9"/>
+    <text text-anchor="middle" fill="#5a9a4a" font-family="sans-serif" font-size="12"
+          font-weight="bold" dy="3">ALCAK ZEMIN</text>
+  </g>
+
+  <!-- Ramp label -->
+  <g transform="translate(375, 218)">
+    <rect x="-30" y="-12" width="60" height="20" rx="3" fill="#2a4422" opacity="0.9"/>
+    <text text-anchor="middle" fill="#66cc55" font-family="sans-serif" font-size="11"
+          font-weight="bold" dy="3">RAMPA</text>
+  </g>
+  <!-- Ramp arrow pointing to ramp hex -->
+  <line x1="370" y1="218" x2="352" y2="218" stroke="#66cc55" stroke-width="1" opacity="0.6"/>
+
+  <!-- Cliff label -->
+  <g transform="translate(118, 210)">
+    <rect x="-50" y="-12" width="100" height="20" rx="3" fill="#3a2a18" opacity="0.9"/>
+    <text text-anchor="middle" fill="#c8a060" font-family="sans-serif" font-size="11"
+          font-weight="bold" dy="3">UCURUM</text>
+  </g>
+  <!-- Cliff arrow -->
+  <line x1="155" y1="210" x2="168" y2="210" stroke="#c8a060" stroke-width="1" opacity="0.6"/>
+
+  <!-- Tower label -->
+  <g transform="translate(309, 85)">
+    <rect x="-22" y="-11" width="44" height="18" rx="3" fill="#3a2a10" opacity="0.9"/>
+    <text text-anchor="middle" fill="#e8be40" font-family="sans-serif" font-size="10"
+          font-weight="bold" dy="3">KULE</text>
+  </g>
+
+  <!-- Range bonus label -->
+  <g transform="translate(555, 208)">
+    <rect x="-72" y="-24" width="144" height="44" rx="5" fill="#2a2210" opacity="0.9"
+          stroke="#ffcc33" stroke-width="0.5" stroke-opacity="0.3"/>
+    <text text-anchor="middle" fill="#ffcc33" font-family="sans-serif" font-size="11"
+          font-weight="bold" dy="-4">MENZIL AVANTAJI</text>
+    <text text-anchor="middle" fill="#ccaa44" font-family="sans-serif" font-size="9" dy="12">
+      Yukari = +menzil, +hasar</text>
+  </g>
+  <!-- Arrow from range label to range arc -->
+  <line x1="490" y1="200" x2="432" y2="180" stroke="#ffcc33" stroke-width="0.8"
+        stroke-dasharray="3,3" opacity="0.3"/>
+
+  <!-- Not passable label near cliff X marks -->
+  <g transform="translate(218, 178)">
+    <text text-anchor="middle" fill="#cc4444" font-family="sans-serif" font-size="8"
+          font-weight="bold" opacity="0.7">GECILEMEZ</text>
+  </g>
+  <g transform="translate(398, 178)">
+    <text text-anchor="middle" fill="#cc4444" font-family="sans-serif" font-size="8"
+          font-weight="bold" opacity="0.7">GECILEMEZ</text>
+  </g>
+
+  <!-- ============ CROSS-SECTION DIAGRAM (bottom-right) ============ -->
+  <g transform="translate(530, 420)">
+    <!-- Background box -->
+    <rect x="-10" y="-10" width="170" height="105" rx="6" fill="#0a120a" opacity="0.85"
+          stroke="#555" stroke-width="0.5"/>
+    <text x="75" y="6" text-anchor="middle" fill="#999" font-family="sans-serif"
+          font-size="9" font-weight="bold">YANDAN GORUNUM</text>
+
+    <!-- Ground levels -->
+    <!-- High ground platform -->
+    <rect x="10" y="22" width="60" height="12" rx="2" fill="#5eaa4f" stroke="#478c39"
+          stroke-width="1"/>
+    <!-- Cliff face -->
+    <rect x="10" y="34" width="60" height="35" rx="0" fill="url(#cliff)"/>
+    <!-- Low ground -->
+    <rect x="10" y="69" width="140" height="12" rx="2" fill="#3a6432" stroke="#2b4d25"
+          stroke-width="1"/>
+    <!-- Ramp slope -->
+    <polygon points="70,34 100,69 70,69" fill="#4a8a3e" stroke="#3a6a30" stroke-width="1"/>
+
+    <!-- Labels -->
+    <text x="40" y="19" text-anchor="middle" fill="#88dd66" font-family="sans-serif"
+          font-size="7">Yuksek</text>
+    <text x="125" y="66" text-anchor="middle" fill="#5a9a4a" font-family="sans-serif"
+          font-size="7">Alcak</text>
+    <text x="82" y="48" fill="#8a7a55" font-family="sans-serif" font-size="7"
+          transform="rotate(40, 82, 48)">Rampa</text>
+
+    <!-- Height arrow -->
+    <line x1="5" y1="28" x2="5" y2="75" stroke="#aaa" stroke-width="0.8"/>
+    <polygon points="5,25 3,30 7,30" fill="#aaa"/>
+    <polygon points="5,78 3,73 7,73" fill="#aaa"/>
+    <text x="0" y="55" text-anchor="middle" fill="#aaa" font-family="sans-serif"
+          font-size="7" transform="rotate(-90, 0, 55)">Yukseklik</text>
+
+    <!-- Tower on high ground -->
+    <polygon points="35,17 40,22 30,22" fill="#e8be40"/>
+    <rect x="33" y="11" width="4" height="7" fill="#daa830"/>
+
+    <!-- Enemy on low ground -->
+    <circle cx="130" cy="66" r="4" fill="#cc3333"/>
+  </g>
+
+  <!-- ============ LEGEND (bottom-left) ============ -->
+  <g transform="translate(30, 460)">
+    <rect x="-10" y="-10" width="200" height="65" rx="6" fill="#0a120a" opacity="0.85"
+          stroke="#555" stroke-width="0.5"/>
+    <circle cx="10" cy="6" r="5" fill="#5eaa4f" stroke="#478c39" stroke-width="1"/>
+    <text x="22" y="10" fill="#aaa" font-family="sans-serif" font-size="9">Yuksek Zemin (elevation 1)</text>
+    <circle cx="10" cy="24" r="5" fill="#3a6432" stroke="#2b4d25" stroke-width="1"/>
+    <text x="22" y="28" fill="#aaa" font-family="sans-serif" font-size="9">Alcak Zemin (elevation 0)</text>
+    <rect x="5" y="37" width="10" height="10" rx="1" fill="url(#cliff)"/>
+    <text x="22" y="47" fill="#aaa" font-family="sans-serif" font-size="9">Ucurum (gecilemez duvar)</text>
+  </g>
+</svg>
