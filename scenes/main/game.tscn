@@ -1,74 +1,75 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene format=3 uid="uid://bq041wj1b213l"]
 
-[ext_resource type="Script" path="res://scripts/core/hex_grid.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/core/grid_visual.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/core/game_camera.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/core/hero.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/core/day_night_visual.gd" id="5"]
+[ext_resource type="Script" uid="uid://boj0bhiv657nu" path="res://scripts/core/hex_grid.gd" id="1"]
+[ext_resource type="Script" uid="uid://qj0crn7tyrc8" path="res://scripts/core/grid_visual.gd" id="2"]
+[ext_resource type="Script" uid="uid://cplcmow07umdx" path="res://scripts/core/game_camera.gd" id="3"]
+[ext_resource type="Script" uid="uid://d0t4naura2pj1" path="res://scripts/core/hero.gd" id="4"]
+[ext_resource type="Script" uid="uid://doy4qa4flndbh" path="res://scripts/core/day_night_visual.gd" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/phase_hud.tscn" id="6"]
-[ext_resource type="Script" path="res://scripts/core/build_manager.gd" id="7"]
-[ext_resource type="Script" path="res://scripts/core/build_ghost.gd" id="8"]
-[ext_resource type="Script" path="res://scripts/core/building_proximity.gd" id="9"]
+[ext_resource type="Script" uid="uid://cnl5i83byge3c" path="res://scripts/core/build_manager.gd" id="7"]
+[ext_resource type="Script" uid="uid://560sqp3oxpfy" path="res://scripts/core/build_ghost.gd" id="8"]
+[ext_resource type="Script" uid="uid://cjy7dsoxns4ot" path="res://scripts/core/building_proximity.gd" id="9"]
 [ext_resource type="PackedScene" path="res://scenes/ui/build_menu.tscn" id="10"]
 [ext_resource type="PackedScene" path="res://scenes/ui/upgrade_popup.tscn" id="11"]
-[ext_resource type="Script" path="res://scripts/combat/wave_manager.gd" id="12"]
+[ext_resource type="Script" uid="uid://civp27pdtg0k6" path="res://scripts/combat/wave_manager.gd" id="12"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hive_hp_bar.tscn" id="13"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_over_screen.tscn" id="14"]
+[ext_resource type="PackedScene" path="res://scenes/ui/sprite_editor_panel.tscn" id="15"]
 
-[node name="Game" type="Node2D"]
+[node name="Game" type="Node2D" unique_id=245950506]
 
-[node name="HexGrid" type="Node2D" parent="."]
+[node name="HexGrid" type="Node2D" parent="." unique_id=1421941020]
 unique_name_in_owner = true
 script = ExtResource("1")
-hex_size = 48.0
-map_radius = 20
 
-[node name="GridVisual" type="Node2D" parent="."]
+[node name="GridVisual" type="Node2D" parent="." unique_id=1580881941]
 script = ExtResource("2")
 
-[node name="Buildings" type="Node2D" parent="."]
+[node name="Buildings" type="Node2D" parent="." unique_id=1156562837]
 unique_name_in_owner = true
 
-[node name="Enemies" type="Node2D" parent="."]
+[node name="Enemies" type="Node2D" parent="." unique_id=70397307]
 unique_name_in_owner = true
 
-[node name="Projectiles" type="Node2D" parent="."]
+[node name="Projectiles" type="Node2D" parent="." unique_id=938639075]
 unique_name_in_owner = true
 
-[node name="BuildGhost" type="Node2D" parent="."]
+[node name="BuildGhost" type="Node2D" parent="." unique_id=1991534812]
 unique_name_in_owner = true
 script = ExtResource("8")
 
-[node name="Hero" type="Node2D" parent="."]
+[node name="Hero" type="Node2D" parent="." unique_id=1275713409]
 unique_name_in_owner = true
 script = ExtResource("4")
 
-[node name="BuildManager" type="Node2D" parent="."]
+[node name="BuildManager" type="Node2D" parent="." unique_id=152674098]
 unique_name_in_owner = true
 script = ExtResource("7")
 
-[node name="WaveManager" type="Node2D" parent="."]
+[node name="WaveManager" type="Node2D" parent="." unique_id=2040272096]
 unique_name_in_owner = true
 script = ExtResource("12")
 
-[node name="BuildingProximity" type="Node" parent="."]
+[node name="BuildingProximity" type="Node" parent="." unique_id=672735102]
 script = ExtResource("9")
 
-[node name="GameCamera" type="Camera2D" parent="."]
+[node name="GameCamera" type="Camera2D" parent="." unique_id=1050509419]
 unique_name_in_owner = true
 script = ExtResource("3")
 
-[node name="DayNightVisual" type="CanvasModulate" parent="."]
+[node name="DayNightVisual" type="CanvasModulate" parent="." unique_id=560322049]
 unique_name_in_owner = true
 color = Color(0.45, 0.5, 0.75, 1)
 script = ExtResource("5")
 
-[node name="PhaseHUD" parent="." instance=ExtResource("6")]
+[node name="PhaseHUD" parent="." unique_id=1872362942 instance=ExtResource("6")]
 
-[node name="HiveHpBar" parent="." instance=ExtResource("13")]
+[node name="HiveHpBar" parent="." unique_id=1986785009 instance=ExtResource("13")]
 
-[node name="BuildMenu" parent="." instance=ExtResource("10")]
+[node name="BuildMenu" parent="." unique_id=73331459 instance=ExtResource("10")]
 
-[node name="UpgradePopup" parent="." instance=ExtResource("11")]
+[node name="UpgradePopup" parent="." unique_id=835827340 instance=ExtResource("11")]
 
-[node name="GameOverScreen" parent="." instance=ExtResource("14")]
+[node name="GameOverScreen" parent="." unique_id=38293358 instance=ExtResource("14")]
+
+[node name="SpriteEditorPanel" parent="." instance=ExtResource("15")]

@@ -55,14 +55,12 @@ extends Resource
 ## Texture path for the static sprite. Empty = use procedural draw.
 @export var sprite_path: String = ""
 
-## Where the structure's visual *base* sits inside the texture, normalized
-## vertically (0 = top of image, 1 = bottom). Used to anchor the sprite so
-## its base hex sits centered on the tile.
-@export var sprite_baseline_v: float = 0.78
+## Scale multiplier relative to hex tile width. (1,1) = sprite width matches
+## one hex tile width, height proportional. Adjust independently for stretch.
+@export var sprite_scale: Vector2 = Vector2(1.0, 1.0)
 
-## Sprite width relative to the hex tile width (sqrt(3) * hex_size).
-## 1.0 = sprite width matches one hex's width exactly.
-@export var sprite_width_factor: float = 1.0
+## Pixel offset from hex center. (0,0) = centered. Negative Y = up.
+@export var sprite_offset: Vector2 = Vector2(0.0, 0.0)
 
 
 ## Get max HP for a given level (1-indexed, clamped to data length).

@@ -70,9 +70,8 @@ func setup(building_data: Resource, coord: Vector2i, world_pos: Vector2, hex_siz
 
 
 ## Creates a static Sprite2D child if data.sprite_path is set.
-## The sprite is sized so its width matches the hex tile width and is
-## anchored so its visual base (data.sprite_baseline_v) sits centered on
-## the tile origin.
+## Scale and offset are driven by data.sprite_scale and data.sprite_offset,
+## editable via the Sprite Placement Editor (tools/sprite_editor.tscn).
 func _setup_sprite() -> void:
 	if data == null or data.sprite_path == "":
 		return
@@ -85,23 +84,15 @@ func _setup_sprite() -> void:
 	_sprite = Sprite2D.new()
 	_sprite.name = "Sprite"
 	_sprite.texture = tex
-	# Tall structures (towers) must always render above walls, hero, etc.
-	# Use absolute z so the sprite isn't pulled down by the parent's z = -1.
 	_sprite.z_as_relative = false
 	_sprite.z_index = 10
-	# Width = pointy-top hex width (sqrt(3) * size). Multiplied by data factor.
-	var hex_width: float = sqrt(3.0) * _draw_size * data.sprite_width_factor
 	var tex_w: float = float(tex.get_width())
-	var tex_h: float = float(tex.get_height())
-	if tex_w <= 0.0 or tex_h <= 0.0:
+	if tex_w <= 0.0:
 		return
-	var s: float = hex_width / tex_w
-	_sprite.scale = Vector2(s, s)
-	# Sprite is centered by default — move it up so the visual baseline
-	# (texture y = tex_h * baseline_v) lands on world y = 0.
-	var baseline_y_in_tex: float = tex_h * data.sprite_baseline_v
-	var center_y_in_tex: float = tex_h * 0.5
-	_sprite.position = Vector2(0.0, -(baseline_y_in_tex - center_y_in_tex) * s)
+	var hex_width: float = sqrt(3.0) * _draw_size
+	var base_s: float = hex_width / tex_w
+	_sprite.scale = Vector2(base_s * data.sprite_scale.x, base_s * data.sprite_scale.y)
+	_sprite.position = data.sprite_offset
 	add_child(_sprite)
 
 
@@ -452,6 +443,16 @@ func _play_upgrade_effect() -> void:
 	tween.set_trans(Tween.TRANS_BACK)
 	tween.tween_property(self, "scale", Vector2(1.25, 1.25), 0.15)
 	tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.2)
+
+
+## Rebuild the Sprite2D child using current data.sprite_scale / sprite_offset.
+## Called by the Sprite Editor to apply live changes.
+func refresh_sprite() -> void:
+	if _sprite != null:
+		_sprite.queue_free()
+		_sprite = null
+	_setup_sprite()
+	queue_redraw()
 
 
 ## Play a placement animation (called after building is added to the scene).

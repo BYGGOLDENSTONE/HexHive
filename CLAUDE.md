@@ -244,15 +244,27 @@ The placeholder procedural `_draw()` art for hero, enemies, and Honey Turret was
 - Procedural body draw, wing flap, attack lunge removed. HP bar still in `_draw()`. Damage flash modulates the sprite.
 
 ### Honey Turret — static sprite anchored to one hex
-- **File:** `assets/sprites/Tower.png` (1024×1024 Meshy render).
-- `scripts/core/building_data.gd` — Added 3 sprite fields:
+- **File:** `assets/sprites/Tower.png` (isometric bee-themed tower, transparent bg).
+- `scripts/core/building_data.gd` — Sprite fields (flexible system, replaces old baseline_v + width_factor):
   - `sprite_path: String` — texture path; empty = fall back to procedural draw
-  - `sprite_baseline_v: float` — normalized vertical position of the structure's visual base inside the texture (0=top, 1=bottom). Anchors the sprite so its base sits on the hex tile center.
-  - `sprite_width_factor: float` — sprite's *total* width relative to one hex tile width (`sqrt(3) * hex_size`). Used to compensate for transparent padding around the structure.
-- `resources/buildings/honey_turret.tres` — `sprite_path = "res://assets/sprites/Tower.png"`, `sprite_baseline_v = 0.666`, `sprite_width_factor = 5.0`. The 5× factor exists because the visible structure only fills ~22% of the texture's width.
-- `scripts/core/building.gd::_setup_sprite()` — Creates a `Sprite2D` child sized so its visible base matches one hex tile, positioned via the baseline pixel offset. Sprite uses `z_as_relative = false` and `z_index = 10` so towers always render above walls, hero, and other buildings (no Y-sorting yet).
+  - `sprite_scale: Vector2` — scale multiplier relative to hex tile width. (1,1) = sprite width matches one hex. X and Y independent for stretch.
+  - `sprite_offset: Vector2` — pixel offset from hex center. (0,0) = centered. Negative Y = up.
+- `resources/buildings/honey_turret.tres` — `sprite_path = "res://assets/sprites/Tower.png"`, `sprite_scale = Vector2(3.45, 2.5)`, `sprite_offset = Vector2(0, -19)`.
+- `scripts/core/building.gd::_setup_sprite()` — Creates a `Sprite2D` child using `base_scale = hex_width / tex_width * sprite_scale`. Position set directly from `sprite_offset`. Sprite uses `z_as_relative = false` and `z_index = 10`.
+- `scripts/core/building.gd::refresh_sprite()` — Destroys and rebuilds the Sprite2D child. Used by the in-game Sprite Editor for live updates.
 - `_draw()` skips the procedural turret body when a sprite is in use; only the HP bar overlay remains.
 - Procedural draw paths for Wall, Flower Garden, Hive remain intact and are used when their `sprite_path` is empty.
+
+### In-Game Sprite Placement Editor
+- **Toggle:** EDIT button (top-right corner of game screen) opens/closes the editor panel.
+- **Controls:** Building selector dropdown, Scale X/Y sliders (0.1–10.0), Offset X/Y sliders (-200–200 px).
+- **Day/Night preview:** Toggle button switches CanvasModulate between day and night colors so the user can check both lighting conditions.
+- **Live update:** Slider changes immediately update all placed buildings of the selected type via `Building.refresh_sprite()`.
+- **Save/Reset:** SAVE writes values to the `.tres` resource file on disk. RESET reloads from disk.
+- **Files:**
+  - `scripts/ui/sprite_editor_panel.gd` — CanvasLayer-based overlay (layer 15), programmatic UI construction
+  - `scenes/ui/sprite_editor_panel.tscn` — Minimal scene wrapper
+  - Added to `scenes/main/game.tscn` as SpriteEditorPanel instance
 
 ### Tooling
 - `tools/recolor_sprites.py` — Reusable Pillow + numpy script. `recolor_directory()` reads a source dir of PNGs and writes a renamed, recolored copy to a target dir. Pipeline: hue shift → saturation → brightness → contrast. Driven by a `main()` config block; rerun after the hero set changes to regenerate Wasp / Hornet.
