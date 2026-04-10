@@ -15,6 +15,9 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/game_over_screen.tscn" id="14"]
 [ext_resource type="Script" uid="uid://doy4qa4flndbh" path="res://scripts/core/day_night_visual.gd" id="15"]
 [ext_resource type="PackedScene" path="res://scenes/ui/model_scale_editor.tscn" id="16"]
+[ext_resource type="PackedScene" path="res://scenes/ui/debug_overlay.tscn" id="17"]
+[ext_resource type="PackedScene" path="res://scenes/ui/perf_monitor.tscn" id="18"]
+[ext_resource type="PackedScene" path="res://scenes/ui/balance_panel.tscn" id="19"]
 
 [node name="Game" type="Node3D"]
 
@@ -72,3 +75,9 @@ script = ExtResource("15")
 [node name="GameOverScreen" parent="." instance=ExtResource("14")]
 
 [node name="ModelScaleEditor" parent="." instance=ExtResource("16")]
+
+[node name="DebugOverlay" parent="." instance=ExtResource("17")]
+
+[node name="PerfMonitor" parent="." instance=ExtResource("18")]
+
+[node name="BalancePanel" parent="." instance=ExtResource("19")]

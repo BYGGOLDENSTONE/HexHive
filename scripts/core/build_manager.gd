@@ -11,6 +11,9 @@ enum BuildState { IDLE, PREVIEWING, WALKING_TO_BUILD, BUILDING }
 var _building_scene: PackedScene = preload("res://scenes/buildings/building.tscn")
 var _state: BuildState = BuildState.IDLE
 var _selected_data: Resource = null
+
+## Dev tool: when true, buildings can be placed during day and without walking.
+var free_build: bool = false
 var _target_coord: Variant = null
 var _hover_valid: bool = false
 var _hover_coord: Variant = null
@@ -47,7 +50,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_build_requested(building_id: StringName) -> void:
-	if not DayNightManager.is_night():
+	if not DayNightManager.is_night() and not free_build:
 		return
 	var data := BuildingRegistry.get_building(building_id)
 	if data == null:
@@ -75,7 +78,7 @@ func _on_tile_clicked(coord: Vector2i) -> void:
 
 	var hero: Node3D = %Hero
 	var dist := HexHelper.distance(hero.current_hex, coord)
-	if dist <= 1:
+	if free_build or dist <= 1:
 		_state = BuildState.BUILDING
 		_execute_build()
 	else:

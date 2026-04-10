@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://k4ctwth3eb73"
-path="res://.godot/imported/tower2.png-59cfba507c3ab92967c3ece387edd598.ctex"
+uid="uid://c6otqypgskbh2"
+path="res://.godot/imported/elevation_concept.svg-0dcd8f02f8a30ed18cd8171777ec4344.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://tower2.png"
-dest_files=["res://.godot/imported/tower2.png-59cfba507c3ab92967c3ece387edd598.ctex"]
+source_file="res://docs/elevation_concept.svg"
+dest_files=["res://.godot/imported/elevation_concept.svg-0dcd8f02f8a30ed18cd8171777ec4344.ctex"]
 
 [params]
 
@@ -38,3 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
+svg/scale=1.0
+editor/scale_with_editor_scale=false
+editor/convert_colors_with_editor_theme=false

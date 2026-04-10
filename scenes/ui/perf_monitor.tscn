@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/perf_monitor.gd" id="1"]
+
+[node name="PerfMonitor" type="CanvasLayer"]
+layer = 19
+script = ExtResource("1")

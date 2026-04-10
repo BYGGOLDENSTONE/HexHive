@@ -99,8 +99,8 @@ res://
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** 3D migration complete — origin/scale/rotation issues fixed, in-game scale editor added
-- **Completed:** Project setup, GDD, market research, roadmap, Phase 1–5, 2D sprite pipeline, **3D migration: full engine conversion**, **3D model pipeline fix (origins, hex rotation, hex_size calibration, facing direction, scale editor)**
+- **Phase:** 3D migration complete — dev tooling suite added
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1–5, 2D sprite pipeline, **3D migration: full engine conversion**, **3D model pipeline fix**, **Dev tools suite (console, debug overlay, perf monitor, balance panel, resource validator)**
 - **Next:** Phase 6 — Economy (Honey)
 
 ## Known Issues / Backlog
@@ -109,6 +109,101 @@ res://
 - **Wall/FlowerGarden/Hive models missing** — using procedural cylinder placeholders until Asset Forge models are produced
 - **Ramp models** — hex_ramp/hex_ramp_edge are smaller than greentile; need scaling or replacement
 - **Model scale fine-tuning** — use in-game SCALE editor (F2) to adjust entity sizes visually
+
+## Dev Tools Suite
+All development tools are non-intrusive — they don't affect gameplay when inactive and are toggled via function keys.
+
+### Constants (`scripts/core/constants.gd`)
+- Central repository for all magic numbers (hero stats, enemy intervals, projectile values, camera settings, wave tuning)
+- `class_name Constants` — accessible anywhere as `Constants.SOME_VALUE`
+
+### Dev Console (`autoload/dev_console.gd`) — Toggle: ~ (tilde/backtick)
+- **Autoload singleton** — accessible as `DevConsole` globally
+- **Auto-logging:** Connects to SignalBus and logs all game events (combat, waves, building, phase changes)
+- **Log categories:** info, warning, error, combat, wave, build, system, command (color-coded)
+- **Public API:** `DevConsole.log_info()`, `.log_warning()`, `.log_error()`, `.log_combat()`, `.log_wave()`, `.log_build()`, `.log_system()`
+- **Built-in cheat commands:**
+  - `god` — Toggle hero + hive invulnerability
+  - `killall` — Kill all alive enemies instantly
+  - `skip [N]` — Skip to day N
+  - `spawn <wasp|hornet> [count]` — Spawn enemies
+  - `ts <value>` — Set time scale (0.1–10.0)
+  - `fb` — Toggle free build (build anywhere, any time, no walking)
+  - `heal` — Full heal hero and hive
+  - `dmg <amount>` — Deal test damage to hero
+  - `day` / `night` — Force phase change
+  - `status` — Show current game state summary
+- **Pauses game** when open, command history with up/down arrows
+
+### Debug Overlay (`scripts/ui/debug_overlay.gd`) — Toggle: F3 (cycles modes)
+- **Modes:** OFF → COORDS → WALKABILITY → RANGES → TARGETS → ALL
+- **COORDS:** Hex (q,r) labels on tiles near hero
+- **WALKABILITY:** Green/red dots showing walkable vs blocked tiles, yellow dots for buildings
+- **RANGES:** Attack range circles for hero and turrets
+- **TARGETS:** Enemy→target lines (red=hero, orange=building, gray=hive), hero auto-walk path (green)
+- Limited to 6-hex radius around hero for performance
+
+### Performance Monitor (`scripts/ui/perf_monitor.gd`) — Toggle: F4
+- **FPS:** Current, average (60-frame window), minimum
+- **Entity counts:** Enemies (alive/total), projectiles, buildings, total scene nodes
+- **Pathfinding:** Calls per second (via `PerfMonitor.track_pathfinding()`)
+- **Memory:** Static memory usage
+- **Time scale indicator** when not 1.0x
+- Updates every 0.25s to avoid overhead
+
+### Balance Tuning Panel (`scripts/ui/balance_panel.gd`) — Toggle: F5
+- **Categories:** Hero, Enemies, Buildings, Waves (dropdown selector)
+- **Hero:** move_speed, max_hp, attack_damage, attack_range, attack_speed, respawn_delay, night_speed_multiplier
+- **Enemies:** Per-type (wasp, hornet) — max_hp, move_speed, attack_damage, attack_speed, attack_range
+- **Buildings:** Per-type per-level — HP, damage, range, attack speed
+- **Waves:** base_wasp_count, wasps_per_day, hornet_start_day, spawn_interval
+- **APPLY LIVE** — Changes take effect immediately on running game
+- **SAVE** — Persists changes to .tres resource files on disk
+- **RESET** — Reverts sliders to original values
+
+### Resource Validator (`autoload/resource_validator.gd`)
+- **Autoload singleton** — runs automatically at startup (deferred, after registries load)
+- **Checks:** Duplicate IDs, empty IDs, per-level array length vs max_level, HP > 0, valid terrain types, model file existence, offensive tag consistency
+- **Reports to:** DevConsole (log_error/log_warning) + Godot output (push_error/push_warning)
+
+### Existing Tools (pre-dev-suite)
+- **Model Scale Editor** (`scripts/ui/model_scale_editor.gd`) — F2, adjusts 3D model scale/offset
+- **Tile Editor** (`scripts/ui/tile_editor_panel.gd`) — Tile visual properties
+
+### Key Bindings Summary
+| Key | Tool |
+|-----|------|
+| ~ | Dev Console |
+| F2 | Model Scale Editor |
+| F3 | Debug Overlay |
+| F4 | Performance Monitor |
+| F5 | Balance Panel |
+
+### Autoload Boot Order
+1. `SignalBus` — Signal definitions (no dependencies)
+2. `DayNightManager` — Depends on SignalBus
+3. `BuildingRegistry` — Loads building .tres files
+4. `EnemyRegistry` — Loads enemy .tres files
+5. `DevConsole` — Connects to SignalBus signals
+6. `ResourceValidator` — Depends on BuildingRegistry + EnemyRegistry (deferred validation)
+
+### Files Added
+- `scripts/core/constants.gd` — Central constants
+- `autoload/dev_console.gd` — Console + cheat commands autoload
+- `scripts/ui/debug_overlay.gd` + `scenes/ui/debug_overlay.tscn` — Debug overlay
+- `scripts/ui/perf_monitor.gd` + `scenes/ui/perf_monitor.tscn` — Performance monitor
+- `scripts/ui/balance_panel.gd` + `scenes/ui/balance_panel.tscn` — Balance tuning
+- `autoload/resource_validator.gd` — Startup validation
+
+### Files Modified
+- `project.godot` — Added DevConsole + ResourceValidator autoloads
+- `scenes/main/game.tscn` — Added DebugOverlay, PerfMonitor, BalancePanel instances
+- `scripts/core/build_manager.gd` — Added `free_build` flag for dev console `fb` command
+- `scripts/combat/wave_manager.gd` — Changed `SPAWN_INTERVAL` const to `spawn_interval` var for balance panel
+
+### Files Removed
+- `scripts/ui/sprite_editor_panel.gd` — Obsolete 2D sprite editor (replaced by ModelScaleEditor)
+- `scenes/ui/sprite_editor_panel.tscn` — Obsolete 2D sprite editor scene
 
 ## Phase 1 Details (Hex Grid)
 - **Grid type:** Pointy-top hex grid (axial coordinates q, r)

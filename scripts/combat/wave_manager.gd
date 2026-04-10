@@ -11,7 +11,7 @@ const EnemyScript = preload("res://scripts/combat/enemy.gd")
 var _enemy_scene: PackedScene = preload("res://scenes/entities/enemy.tscn")
 var _spawn_queue: Array[StringName] = []
 var _spawn_timer: float = 0.0
-const SPAWN_INTERVAL: float = 0.45
+var spawn_interval: float = 0.45
 var _alive: Array[Node3D] = []
 var _wave_total: int = 0
 var _wave_active: bool = false
@@ -31,7 +31,7 @@ func _process(delta: float) -> void:
 	_spawn_timer -= delta
 	if _spawn_timer <= 0.0:
 		_spawn_next()
-		_spawn_timer = SPAWN_INTERVAL
+		_spawn_timer = spawn_interval
 
 
 func _on_day_started(day_number: int) -> void:
