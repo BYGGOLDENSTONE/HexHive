@@ -8,7 +8,8 @@ signal tile_unhovered()
 signal tile_clicked(coord: Vector2i)
 
 ## Hex outer radius in world units (center to vertex).
-@export var hex_size: float = 1.0
+## Matches greentile.glb outer radius after pointy-top fix.
+@export var hex_size: float = 0.6929
 
 ## Map radius in hexes (produces a hex-shaped map).
 @export var map_radius: int = 20

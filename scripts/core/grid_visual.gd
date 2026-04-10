@@ -37,6 +37,7 @@ var _cliff_resource: Variant = null
 
 func _ready() -> void:
 	_hero = get_tree().get_first_node_in_group(&"hero")
+	_load_scale_config()
 	_preload_resources()
 	_create_all_tiles()
 	_create_highlight_meshes()
@@ -79,6 +80,7 @@ func _create_tile_instance(tile: HexTile, coord: Vector2i) -> Node3D:
 		model = _create_fallback_tile()
 
 	model.scale = tile_model_scale
+	model.rotation.y = deg_to_rad(30)  # Flat-top mesh → pointy-top orientation
 	wrapper.add_child(model)
 	HexHelper.auto_center_model(model)
 
@@ -176,6 +178,25 @@ func _create_hex_disc(color: Color) -> MeshInstance3D:
 	mat.no_depth_test = true
 	mi.set_surface_override_material(0, mat)
 	return mi
+
+
+# -- Scale editor support --
+
+func _load_scale_config() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("res://config/model_scales.cfg") == OK:
+		var s: float = cfg.get_value("tile", "scale", tile_model_scale.x)
+		tile_model_scale = Vector3(s, s, s)
+
+
+func update_tile_scale(new_scale: Vector3) -> void:
+	tile_model_scale = new_scale
+	for coord: Vector2i in _tile_instances:
+		var wrapper: Node3D = _tile_instances[coord]
+		if wrapper.get_child_count() > 0:
+			var model: Node3D = wrapper.get_child(0)
+			model.scale = new_scale
+			HexHelper.auto_center_model(model)
 
 
 func _process(_delta: float) -> void:

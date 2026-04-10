@@ -24,7 +24,9 @@ Bee-themed roguelite base defense game in Godot 4.6. See `docs/GDD.md` for game 
 - **Full 3D engine** — all entities are Node3D with GLB models from Asset Forge
 - Characters (hero, wasp, hornet) use GLB models with runtime rotation for facing
 - Buildings use GLB models (tower.glb) or procedural cylinder placeholders
-- Hex tiles use `greentile.glb` instanced per tile with auto-centering
+- Hex tiles use `greentile.glb` instanced per tile, rotated 30° in code for pointy-top
+- All GLB model origins fixed to (0,0,0) bottom-center via Blender MCP
+- Model facing direction: default forward is -Z; rotation uses `atan2(-x, -z)`
 - Hornet = enemybee model with material_tint (crimson) + 1.4x scale
 - Asset folder: `assets/models/` with subfolders for characters, tiles, ramps, buildings, cliffs
 - Humanoid bee aesthetic, warm golds for allies, dark crimson Hornets
@@ -43,7 +45,7 @@ Bee-themed roguelite base defense game in Godot 4.6. See `docs/GDD.md` for game 
 - **Language:** GDScript (C++ GDExtension for hot paths)
 - **Art:** Asset Forge → GLB 3D models, isometric Camera3D (55° pitch)
 - **Lighting:** DirectionalLight3D + WorldEnvironment, day/night tweens
-- **Grid:** Pointy-top hex grid on XZ plane, Y = elevation, hex_size = 1.0 world unit
+- **Grid:** Pointy-top hex grid on XZ plane, Y = elevation, hex_size = 0.6929 world unit (matches greentile.glb outer radius)
 
 ## Project Structure
 ```
@@ -97,17 +99,16 @@ res://
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** 3D migration in progress (all systems converted, scale/position tuning needed)
-- **Completed:** Project setup, GDD, market research, roadmap, Phase 1–5, 2D sprite pipeline, **3D migration: full engine conversion from Node2D to Node3D**
-- **Next:** Fix 3D model scale/position issues, then Phase 6 — Economy (Honey)
+- **Phase:** 3D migration complete — origin/scale/rotation issues fixed, in-game scale editor added
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1–5, 2D sprite pipeline, **3D migration: full engine conversion**, **3D model pipeline fix (origins, hex rotation, hex_size calibration, facing direction, scale editor)**
+- **Next:** Phase 6 — Economy (Honey)
 
 ## Known Issues / Backlog
 > Tracked bugs and improvements to address before/during the next phase.
 
-- **3D scale/position tuning** — Asset Forge models have origin offsets; auto_center_model helps but tile spacing, character sizes, and building scales need fine-tuning per model
 - **Wall/FlowerGarden/Hive models missing** — using procedural cylinder placeholders until Asset Forge models are produced
-- **Ramp models** — hex_ramp/hex_ramp_edge are smaller than greentile (1.0 vs 1.732 wide); need scaling or replacement
-- **2D editor panels removed** — SpriteEditorPanel and TileEditorPanel were 2D-specific, not included in 3D scene
+- **Ramp models** — hex_ramp/hex_ramp_edge are smaller than greentile; need scaling or replacement
+- **Model scale fine-tuning** — use in-game SCALE editor (F2) to adjust entity sizes visually
 
 ## Phase 1 Details (Hex Grid)
 - **Grid type:** Pointy-top hex grid (axial coordinates q, r)

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/model_scale_editor.gd" id="1"]
+
+[node name="ModelScaleEditor" type="CanvasLayer"]
+layer = 15
+script = ExtResource("1")

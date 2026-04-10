@@ -133,7 +133,7 @@ func _physics_process(delta: float) -> void:
 	if dist <= data.attack_range:
 		_try_attack(delta)
 		if dist > 0.001:
-			_target_yaw = atan2(to_target.x, to_target.z)
+			_target_yaw = atan2(-to_target.x, -to_target.z)
 	else:
 		var dir: Vector3 = to_target / dist if dist > 0.001 else Vector3.ZERO
 		position += dir * data.move_speed * delta
@@ -142,7 +142,7 @@ func _physics_process(delta: float) -> void:
 		var tile: HexTile = hex_grid.get_tile(hex)
 		if tile:
 			position.y = float(tile.elevation) * hex_grid.elevation_height
-		_target_yaw = atan2(dir.x, dir.z)
+		_target_yaw = atan2(-dir.x, -dir.z)
 		_update_hex_tracking()
 
 	if _model:
@@ -250,6 +250,21 @@ func _play_death() -> void:
 
 func is_alive() -> bool:
 	return not _is_dying and health != null and not health.is_dead
+
+
+# -- Scale editor support --
+
+func update_model_scale(s: float) -> void:
+	if _model:
+		_model.scale = Vector3.ONE * s
+		HexHelper.auto_center_model(_model)
+		_base_model_y = _model.position.y
+
+
+func update_model_y_offset(y: float) -> void:
+	if _model:
+		HexHelper.auto_center_model(_model)
+		_base_model_y = _model.position.y + y
 
 
 # -- Flash tinting --

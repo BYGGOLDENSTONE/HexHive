@@ -219,6 +219,22 @@ func refresh_sprite() -> void:
 	_load_model()
 
 
+# -- Scale editor support --
+
+func update_model_scale(s: Vector3) -> void:
+	if _model == null or data == null or data.model_path == "":
+		return
+	_model.scale = s
+	HexHelper.auto_center_model(_model)
+
+
+func update_model_y_offset(y: float) -> void:
+	if _model == null or data == null or data.model_path == "":
+		return
+	HexHelper.auto_center_model(_model)
+	_model.position.y += y
+
+
 func _set_model_emission(color: Color) -> void:
 	if _model == null:
 		return

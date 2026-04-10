@@ -97,3 +97,28 @@ func _tween_to_night() -> void:
 func _kill_tween() -> void:
 	if _tween and _tween.is_valid():
 		_tween.kill()
+
+
+# -- Scale editor preview support --
+
+func set_preview_day() -> void:
+	_kill_tween()
+	_sun.light_color = day_light_color
+	_sun.light_energy = day_light_energy
+	_environment.ambient_light_color = day_ambient_color
+	_environment.ambient_light_energy = day_ambient_energy
+
+
+func set_preview_night() -> void:
+	_kill_tween()
+	_sun.light_color = night_light_color
+	_sun.light_energy = night_light_energy
+	_environment.ambient_light_color = night_ambient_color
+	_environment.ambient_light_energy = night_ambient_energy
+
+
+func restore_current_phase() -> void:
+	if DayNightManager.is_day():
+		set_preview_day()
+	else:
+		set_preview_night()

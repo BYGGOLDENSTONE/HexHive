@@ -1,4 +1,4 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" format=3]
 
 [ext_resource type="Script" path="res://scripts/combat/enemy_data.gd" id="1"]
 
@@ -7,13 +7,7 @@ script = ExtResource("1")
 id = &"wasp"
 display_name = "Wasp"
 tags = Array[StringName]([&"melee", &"swarm", &"fast"])
-max_hp = 30.0
 move_speed = 2.0
-attack_damage = 5.0
-attack_speed = 1.5
 attack_range = 0.8
-spawn_delay = 0.25
 model_path = "res://assets/models/characters/wasp/enemybee.glb"
 model_scale = 0.5
-model_y_offset = 0.0
-material_tint = Color(1, 1, 1, 1)

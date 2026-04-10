@@ -46,6 +46,7 @@ var _respawn_timer: float = 0.0
 var _spawn_position: Vector3 = Vector3.ZERO
 var _hover_time: float = 0.0
 var _target_yaw: float = 0.0
+var _base_model_y: float = 0.0
 
 ## Auto-walk state.
 var _auto_walk_target_hex: Variant = null
@@ -66,6 +67,7 @@ var _flash_timer: float = 0.0
 
 func _ready() -> void:
 	add_to_group(&"hero")
+	_load_scale_config()
 
 	_spawn_position = hex_grid.hex_to_world(Vector2i(1, 0))
 	_spawn_position.y += model_y_offset
@@ -98,6 +100,7 @@ func _load_model() -> void:
 	_model.scale = Vector3.ONE * model_scale_factor
 	add_child(_model)
 	HexHelper.auto_center_model(_model)
+	_base_model_y = _model.position.y
 
 
 func _process(delta: float) -> void:
@@ -134,13 +137,13 @@ func _process(delta: float) -> void:
 			moved_dir = input_dir
 	_update_hex_tracking()
 
-	# Rotate model to face movement direction.
+	# Rotate model to face movement direction (model default forward is -Z).
 	if moved_dir.length_squared() > 0.0001:
-		_target_yaw = atan2(moved_dir.x, moved_dir.z)
+		_target_yaw = atan2(-moved_dir.x, -moved_dir.z)
 	if _model:
 		_model.rotation.y = lerp_angle(_model.rotation.y, _target_yaw, delta * rotation_speed)
 		# Hover bobbing.
-		_model.position.y = sin(_hover_time) * hover_amplitude
+		_model.position.y = _base_model_y + sin(_hover_time) * hover_amplitude
 
 	# Flash effect via model tint.
 	if _model and _flash_timer > 0.0:
@@ -397,6 +400,28 @@ func _cancel_auto_walk() -> void:
 	is_auto_walking = false
 	_auto_walk_stuck_time = 0.0
 	SignalBus.build_walk_cancelled.emit()
+
+
+# -- Scale editor support --
+
+func _load_scale_config() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("res://config/model_scales.cfg") == OK:
+		model_scale_factor = cfg.get_value("hero", "scale", model_scale_factor)
+		model_y_offset = cfg.get_value("hero", "y_offset", model_y_offset)
+
+
+func update_model_scale(s: float) -> void:
+	model_scale_factor = s
+	if _model:
+		_model.scale = Vector3.ONE * s
+		HexHelper.auto_center_model(_model)
+		_base_model_y = _model.position.y
+
+
+func update_model_y_offset(y: float) -> void:
+	model_y_offset = y
+	position.y = _get_ground_height(position)
 
 
 # -- Model tinting utility --
