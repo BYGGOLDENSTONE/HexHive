@@ -84,8 +84,11 @@ func _create_tile_instance(tile: HexTile, coord: Vector2i) -> Node3D:
 	wrapper.add_child(model)
 	HexHelper.auto_center_model(model)
 
-	if tile.elevation > 0 and not tile.is_ramp:
-		_apply_elevation_tint(model, tile.elevation)
+	# Apply terrain-specific tinting (replaces old elevation-only tint).
+	_apply_terrain_tint(model, tile)
+
+	# Add procedural decoration meshes based on terrain type.
+	_add_terrain_decoration(wrapper, tile, coord)
 
 	return wrapper
 
@@ -132,10 +135,160 @@ func _create_fallback_tile() -> Node3D:
 	return mi
 
 
-func _apply_elevation_tint(instance: Node3D, elevation: int) -> void:
-	# Slightly brighter green for elevated tiles.
-	var brightness: float = 1.0 + elevation * 0.15
-	_traverse_and_tint(instance, Color(brightness, brightness, brightness))
+func _apply_terrain_tint(instance: Node3D, tile: HexTile) -> void:
+	var tint: Color
+	match tile.terrain:
+		HexTile.TerrainType.GRASS:
+			tint = Color(1.0, 1.0, 1.0)
+		HexTile.TerrainType.MOUNTAIN:
+			tint = Color(0.6, 0.55, 0.5)
+		HexTile.TerrainType.FOREST:
+			tint = Color(0.55, 0.75, 0.4)
+		HexTile.TerrainType.FLOWER:
+			tint = Color(1.1, 1.0, 0.85)
+		HexTile.TerrainType.HIVE:
+			tint = Color(1.1, 0.95, 0.7)
+		HexTile.TerrainType.WATER:
+			tint = Color(0.4, 0.6, 0.9)
+		_:
+			tint = Color(1.0, 1.0, 1.0)
+
+	# Elevation brightness boost.
+	if tile.elevation > 0 and not tile.is_ramp:
+		tint *= Color(1.15, 1.15, 1.15)
+
+	_traverse_and_tint(instance, tint)
+
+
+func _add_terrain_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> void:
+	match tile.terrain:
+		HexTile.TerrainType.MOUNTAIN:
+			if not tile.is_ramp:
+				_add_mountain_decoration(wrapper, tile, coord)
+		HexTile.TerrainType.FOREST:
+			_add_forest_decoration(wrapper, tile, coord)
+		HexTile.TerrainType.FLOWER:
+			_add_flower_decoration(wrapper, tile, coord)
+
+
+func _add_mountain_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> void:
+	var local_rng := RandomNumberGenerator.new()
+	local_rng.seed = coord.x * 7919 + coord.y * 6271
+
+	# 1-2 rock peaks per mountain tile.
+	var rock_count: int = local_rng.randi_range(1, 2)
+	for i: int in range(rock_count):
+		var mi := MeshInstance3D.new()
+		var mesh := CylinderMesh.new()
+		# Tapered cylinder for rock shape (wider base, narrow top).
+		mesh.bottom_radius = hex_grid.hex_size * (0.2 + local_rng.randf() * 0.15)
+		mesh.top_radius = mesh.bottom_radius * (0.15 + local_rng.randf() * 0.25)
+		mesh.height = hex_grid.hex_size * (0.5 + local_rng.randf() * 0.5)
+		mesh.radial_segments = 5 + local_rng.randi_range(0, 2)
+		mi.mesh = mesh
+		var mat := StandardMaterial3D.new()
+		var shade: float = 0.35 + local_rng.randf() * 0.15
+		mat.albedo_color = Color(shade + 0.05, shade, shade - 0.03)
+		mi.set_surface_override_material(0, mat)
+		var base_y: float = float(tile.elevation) * hex_grid.elevation_height
+		mi.position.y = base_y + mesh.height * 0.5
+		# Random offset within hex.
+		var offset_angle: float = local_rng.randf() * TAU
+		var offset_dist: float = local_rng.randf() * hex_grid.hex_size * 0.25
+		mi.position.x = cos(offset_angle) * offset_dist
+		mi.position.z = sin(offset_angle) * offset_dist
+		mi.rotation.y = local_rng.randf() * TAU
+		wrapper.add_child(mi)
+
+
+func _add_forest_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> void:
+	var local_rng := RandomNumberGenerator.new()
+	local_rng.seed = coord.x * 4507 + coord.y * 3571
+
+	var tree_count: int = local_rng.randi_range(1, 3)
+	var base_y: float = float(tile.elevation) * hex_grid.elevation_height
+
+	for i: int in range(tree_count):
+		var tree := Node3D.new()
+
+		# Trunk: thin cylinder.
+		var trunk_mi := MeshInstance3D.new()
+		var trunk_mesh := CylinderMesh.new()
+		trunk_mesh.top_radius = 0.025
+		trunk_mesh.bottom_radius = 0.045
+		trunk_mesh.height = 0.25 + local_rng.randf() * 0.2
+		trunk_mesh.radial_segments = 5
+		trunk_mi.mesh = trunk_mesh
+		var trunk_mat := StandardMaterial3D.new()
+		trunk_mat.albedo_color = Color(0.4, 0.3, 0.2)
+		trunk_mi.set_surface_override_material(0, trunk_mat)
+		trunk_mi.position.y = trunk_mesh.height * 0.5
+		tree.add_child(trunk_mi)
+
+		# Canopy: sphere.
+		var canopy_mi := MeshInstance3D.new()
+		var canopy_mesh := SphereMesh.new()
+		canopy_mesh.radius = 0.1 + local_rng.randf() * 0.08
+		canopy_mesh.height = canopy_mesh.radius * 2.0
+		canopy_mesh.radial_segments = 8
+		canopy_mesh.rings = 4
+		canopy_mi.mesh = canopy_mesh
+		var canopy_mat := StandardMaterial3D.new()
+		canopy_mat.albedo_color = Color(
+			0.15 + local_rng.randf() * 0.15,
+			0.4 + local_rng.randf() * 0.25,
+			0.1 + local_rng.randf() * 0.1
+		)
+		canopy_mi.set_surface_override_material(0, canopy_mat)
+		canopy_mi.position.y = trunk_mesh.height + canopy_mesh.radius * 0.6
+		tree.add_child(canopy_mi)
+
+		# Random position within hex.
+		var offset_angle: float = local_rng.randf() * TAU
+		var offset_dist: float = local_rng.randf() * hex_grid.hex_size * 0.35
+		tree.position.x = cos(offset_angle) * offset_dist
+		tree.position.z = sin(offset_angle) * offset_dist
+		tree.position.y = base_y
+
+		wrapper.add_child(tree)
+
+
+func _add_flower_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> void:
+	var local_rng := RandomNumberGenerator.new()
+	local_rng.seed = coord.x * 8837 + coord.y * 5399
+
+	var flower_count: int = local_rng.randi_range(3, 6)
+	var base_y: float = float(tile.elevation) * hex_grid.elevation_height
+	var flower_colors: Array[Color] = [
+		Color(1.0, 0.85, 0.2),   # Golden yellow
+		Color(1.0, 0.6, 0.2),    # Warm orange
+		Color(0.95, 0.5, 0.7),   # Soft pink
+		Color(0.95, 0.95, 0.85), # Cream white
+		Color(0.85, 0.65, 0.95), # Lavender
+	]
+
+	for i: int in range(flower_count):
+		var mi := MeshInstance3D.new()
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.03 + local_rng.randf() * 0.02
+		mesh.height = mesh.radius * 1.5
+		mesh.radial_segments = 6
+		mesh.rings = 3
+		mi.mesh = mesh
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = flower_colors[local_rng.randi() % flower_colors.size()]
+		mat.emission_enabled = true
+		mat.emission = mat.albedo_color * 0.3
+		mat.emission_energy_multiplier = 0.5
+		mi.set_surface_override_material(0, mat)
+
+		var offset_angle: float = local_rng.randf() * TAU
+		var offset_dist: float = local_rng.randf() * hex_grid.hex_size * 0.4
+		mi.position.x = cos(offset_angle) * offset_dist
+		mi.position.z = sin(offset_angle) * offset_dist
+		mi.position.y = base_y + 0.06
+
+		wrapper.add_child(mi)
 
 
 func _traverse_and_tint(node: Node, tint: Color) -> void:
@@ -178,6 +331,35 @@ func _create_hex_disc(color: Color) -> MeshInstance3D:
 	mat.no_depth_test = true
 	mi.set_surface_override_material(0, mat)
 	return mi
+
+
+# -- Map editor support --
+
+## Rebuild a single tile's visual (used by map editor for live updates).
+func rebuild_tile(coord: Vector2i) -> void:
+	# Remove old instance.
+	if _tile_instances.has(coord):
+		var old: Node3D = _tile_instances[coord]
+		old.queue_free()
+		_tile_instances.erase(coord)
+
+	# Create new instance with current tile data.
+	var tile: HexTile = hex_grid.get_tile(coord)
+	if tile == null:
+		return
+	var instance: Node3D = _create_tile_instance(tile, coord)
+	if instance:
+		add_child(instance)
+		_tile_instances[coord] = instance
+
+
+## Rebuild all tile visuals (used after map load).
+func rebuild_all_tiles() -> void:
+	for coord: Vector2i in _tile_instances:
+		var old: Node3D = _tile_instances[coord]
+		old.queue_free()
+	_tile_instances.clear()
+	_create_all_tiles()
 
 
 # -- Scale editor support --

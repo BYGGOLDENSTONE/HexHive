@@ -59,9 +59,9 @@ func _validate_buildings() -> void:
 			if data.max_hp_per_level[i] <= 0.0:
 				_issues.append("Building '%s' L%d has non-positive HP: %.0f" % [data.id, i + 1, data.max_hp_per_level[i]])
 
-		# Buildable_on sanity.
+		# Buildable_on sanity (0=GRASS, 1=MOUNTAIN, 2=WATER, 3=HIVE, 4=FOREST, 5=FLOWER).
 		for terrain in data.buildable_on:
-			if terrain < 0 or terrain > 3:
+			if terrain < 0 or terrain > 5:
 				_warnings.append("Building '%s': invalid buildable_on terrain type: %d" % [data.id, terrain])
 
 

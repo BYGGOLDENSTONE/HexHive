@@ -3,6 +3,8 @@ extends Node3D
 ## Manages the hex tile map. Creates, stores, and queries pointy-top hex tiles.
 ## Hex grid lives on the XZ plane; Y axis is used for elevation.
 
+const _MapGen := preload("res://scripts/core/map_generator.gd")
+
 signal tile_hovered(coord: Vector2i)
 signal tile_unhovered()
 signal tile_clicked(coord: Vector2i)
@@ -26,15 +28,22 @@ var tiles: Dictionary = {}  # Dictionary[Vector2i, HexTile]
 ## Currently hovered tile coordinate (or null).
 var hovered_coord: Variant = null
 
+## Effective seed used for map generation (for debug display / reproducibility).
+var effective_seed: int = 0
+
+
+const MAP_SAVE_PATH: String = "res://resources/maps/custom_map.json"
+
 
 func _ready() -> void:
 	slot_radius = hex_size * 3.0 / 5.0
-	_generate_map()
-	_setup_elevation()
+	_create_tiles()
+	if not _load_map_from_file():
+		_generate_terrain()
 
 
-## Generate a hex-shaped map with the given radius.
-func _generate_map() -> void:
+## Create all hex tiles with default GRASS terrain.
+func _create_tiles() -> void:
 	tiles.clear()
 	var all_coords: Array[Vector2i] = HexHelper.get_hexes_in_range(Vector2i.ZERO, map_radius)
 	for coord in all_coords:
@@ -42,31 +51,85 @@ func _generate_map() -> void:
 		tiles[coord] = tile
 
 
-## Set up the test elevation island: radius-3 elevated plateau with 2 ramps.
-func _setup_elevation() -> void:
-	var island_radius: int = 3
-	var center: Vector2i = Vector2i.ZERO
+## Run the procedural map generator to assign terrain, elevation, and ramps.
+func _generate_terrain() -> void:
+	var config: Dictionary = {}
+	effective_seed = _MapGen.generate(tiles, config, hex_size, map_radius)
 
-	var ramp_configs: Array = [
-		{"coord": Vector2i(0, 3),  "exit_dir": 5},
-		{"coord": Vector2i(-3, 0), "exit_dir": 3},
-	]
-	var ramp_coords: Array[Vector2i] = []
-	for cfg in ramp_configs:
-		ramp_coords.append(cfg["coord"] as Vector2i)
 
-	for coord_key: Vector2i in tiles:
-		var dist: int = HexHelper.distance(center, coord_key)
-		if dist <= island_radius:
-			var tile: HexTile = tiles[coord_key]
-			tile.elevation = 1
+## Save all non-default tile data to a JSON file.
+func save_map_to_file() -> bool:
+	var map_data: Array = []
+	for coord: Vector2i in tiles:
+		var tile: HexTile = tiles[coord]
+		# Only save tiles that differ from default (GRASS, elevation 0, no ramp).
+		if tile.terrain != HexTile.TerrainType.GRASS or tile.elevation != 0 or tile.is_ramp:
+			var entry: Dictionary = {
+				"q": coord.x,
+				"r": coord.y,
+				"terrain": int(tile.terrain),
+				"elevation": tile.elevation,
+			}
+			if tile.is_ramp:
+				entry["is_ramp"] = true
+				entry["ramp_exit_dir"] = tile.ramp_exit_dir
+			map_data.append(entry)
 
-	for cfg in ramp_configs:
-		var ramp_coord: Vector2i = cfg["coord"] as Vector2i
-		var tile: HexTile = get_tile(ramp_coord)
-		if tile:
-			tile.is_ramp = true
-			tile.ramp_exit_dir = cfg["exit_dir"] as int
+	var json_str: String = JSON.stringify(map_data, "\t")
+	var file := FileAccess.open(MAP_SAVE_PATH, FileAccess.WRITE)
+	if file == null:
+		push_error("Failed to save map: cannot open " + MAP_SAVE_PATH)
+		return false
+	file.store_string(json_str)
+	file.close()
+	print("[HexGrid] Map saved to %s (%d modified tiles)" % [MAP_SAVE_PATH, map_data.size()])
+	return true
+
+
+## Load map data from a JSON file. Returns true if loaded successfully.
+func _load_map_from_file() -> bool:
+	if not FileAccess.file_exists(MAP_SAVE_PATH):
+		return false
+
+	var file := FileAccess.open(MAP_SAVE_PATH, FileAccess.READ)
+	if file == null:
+		return false
+	var json_str: String = file.get_as_text()
+	file.close()
+
+	var json := JSON.new()
+	if json.parse(json_str) != OK:
+		push_error("Failed to parse map file: " + json.get_error_message())
+		return false
+
+	var map_data: Array = json.data as Array
+	if map_data == null:
+		return false
+
+	for entry: Variant in map_data:
+		var d: Dictionary = entry as Dictionary
+		var coord := Vector2i(d["q"] as int, d["r"] as int)
+		var tile: HexTile = get_tile(coord)
+		if tile == null:
+			continue
+		tile.terrain = d["terrain"] as HexTile.TerrainType
+		tile.elevation = d.get("elevation", 0) as int
+		if d.has("is_ramp"):
+			tile.is_ramp = d["is_ramp"] as bool
+			tile.ramp_exit_dir = d.get("ramp_exit_dir", -1) as int
+
+	print("[HexGrid] Map loaded from %s (%d modified tiles)" % [MAP_SAVE_PATH, map_data.size()])
+	return true
+
+
+## Reset all tiles to default GRASS and regenerate with procedural generator.
+func reset_to_procedural() -> void:
+	for tile: HexTile in tiles.values():
+		tile.terrain = HexTile.TerrainType.GRASS
+		tile.elevation = 0
+		tile.is_ramp = false
+		tile.ramp_exit_dir = -1
+	_generate_terrain()
 
 
 ## Get the tile at a given axial coordinate, or null if out of bounds.

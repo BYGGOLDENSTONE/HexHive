@@ -71,3 +71,14 @@ const CAMERA_ZOOM_SMOOTHING: float = 10.0
 const HEX_SIZE: float = 0.6929
 const MAP_RADIUS: int = 20
 const ELEVATION_HEIGHT: float = 1.0
+
+# -- Map Generation --
+const MAP_GEN_PLATEAU_RADIUS: int = 4
+const MAP_GEN_PATH_COUNT: int = 3
+const MAP_GEN_PATH_WIDTH: int = 2
+const MAP_GEN_CHOKE_WIDTH: int = 1
+const MAP_GEN_CHOKE_DISTANCE: int = 7
+const MAP_GEN_NOISE_FREQUENCY: float = 0.12
+const MAP_GEN_NOISE_THRESHOLD: float = 0.45
+const MAP_GEN_FOREST_CLUSTER_COUNT: int = 8
+const MAP_GEN_FLOWER_PATCH_COUNT: int = 6

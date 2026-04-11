@@ -9,6 +9,8 @@ enum TerrainType {
 	MOUNTAIN,
 	WATER,
 	HIVE,
+	FOREST,
+	FLOWER,
 }
 
 ## Axial coordinate of this tile
@@ -121,3 +123,9 @@ func is_walkable() -> bool:
 	if building != null and building.data != null and building.data.blocks_walkability:
 		return false
 	return true
+
+
+## Check if the tile allows building placement.
+## GRASS, HIVE, and FLOWER tiles are buildable; MOUNTAIN, WATER, FOREST are not.
+func is_buildable() -> bool:
+	return terrain == TerrainType.GRASS or terrain == TerrainType.HIVE or terrain == TerrainType.FLOWER
