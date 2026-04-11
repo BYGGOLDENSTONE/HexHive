@@ -3,6 +3,8 @@ extends Node
 ## Night = safe building phase. Day = combat phase with enemy waves.
 ## Game starts at Night 0. Player manually triggers each new day.
 
+const GameConstants = preload("res://scripts/core/constants.gd")
+
 enum Phase { NIGHT, DAY }
 
 ## Current phase.
@@ -16,6 +18,9 @@ var day_number: int = 0
 
 ## Whether a phase transition is currently in progress.
 var _transitioning: bool = false
+
+## True once the run has been won (prevents further day/night cycling).
+var _run_won: bool = false
 
 ## Live wave state — populated by SignalBus wave signals.
 var _wave_total: int = 0
@@ -42,6 +47,13 @@ func _on_start_day_requested() -> void:
 func _on_day_wave_cleared() -> void:
 	if current_phase != Phase.DAY or _transitioning:
 		return
+	# Check for victory — clearing the final day wins the run.
+	if day_number >= GameConstants.VICTORY_DAY and not _run_won:
+		_run_won = true
+		_transitioning = true
+		SignalBus.run_won.emit(day_number)
+		_transitioning = false
+		return
 	_transition_to_night()
 
 
@@ -62,6 +74,7 @@ func _on_restart_requested() -> void:
 	_wave_total = 0
 	_wave_remaining = 0
 	_transitioning = false
+	_run_won = false
 	_enter_night()
 
 

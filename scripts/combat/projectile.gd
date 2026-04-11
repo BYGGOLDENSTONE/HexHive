@@ -3,12 +3,18 @@ extends Node3D
 ## Honey-drop projectile in 3D. Travels toward target with light homing.
 ## On impact deals damage and disappears.
 
+const DamageTableScript = preload("res://scripts/combat/damage_table.gd")
+
 var team: StringName = &"player"
 var target: Node3D = null
 var damage: float = 10.0
 var speed: float = 22.0
 var lifetime: float = 3.0
 var homing: bool = true
+
+## Attacker tags used by the tag-based damage pipeline.
+## Filled at spawn time by hero/turret callers (e.g. [&"ranged", &"honey"]).
+var attacker_tags: Array[StringName] = [&"ranged"]
 
 var _velocity: Vector3 = Vector3.ZERO
 var _direction: Vector3 = Vector3.FORWARD
@@ -75,7 +81,21 @@ func _apply_hit() -> void:
 		return
 	_hit = true
 	if target != null and is_instance_valid(target) and target.has_method("take_damage"):
-		target.take_damage(damage)
+		# Apply tag-based modifiers if the target has tags.
+		var final_dmg: float = damage
+		var target_tags: Array = []
+		if "tags" in target:
+			for t in target.tags:
+				target_tags.append(String(t))
+		elif target.has_method("get") and target.get("data") != null and "tags" in target.data:
+			for t in target.data.tags:
+				target_tags.append(String(t))
+		if not target_tags.is_empty():
+			var atk_tags: Array = []
+			for t in attacker_tags:
+				atk_tags.append(String(t))
+			final_dmg = DamageTableScript.compute(damage, atk_tags, target_tags)
+		target.take_damage(final_dmg)
 	_play_impact()
 
 

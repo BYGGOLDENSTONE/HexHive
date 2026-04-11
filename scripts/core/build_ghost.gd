@@ -18,6 +18,7 @@ func _ready() -> void:
 	SignalBus.build_preview_started.connect(_on_preview_started)
 	SignalBus.build_preview_ended.connect(_on_preview_ended)
 	SignalBus.building_placed.connect(_on_building_placed)
+	SignalBus.honey_changed.connect(_on_honey_changed)
 
 	# Create ghost mesh — a simple hex disc that changes color.
 	_ghost_mesh = MeshInstance3D.new()
@@ -60,11 +61,27 @@ func _process(_delta: float) -> void:
 			_update_color()
 
 
+func _can_afford() -> bool:
+	if _building_data == null:
+		return true
+	var cost: int = _building_data.get_cost(1)
+	return EconomyManager.can_afford(cost)
+
+
 func _update_color() -> void:
+	# Green = valid + affordable, amber = valid but too expensive, red = invalid placement.
 	if _is_valid:
-		_ghost_mat.albedo_color = Color(0.3, 1.0, 0.3, 0.35)
+		if _can_afford():
+			_ghost_mat.albedo_color = Color(0.3, 1.0, 0.3, 0.35)
+		else:
+			_ghost_mat.albedo_color = Color(1.0, 0.75, 0.2, 0.4)
 	else:
 		_ghost_mat.albedo_color = Color(1.0, 0.3, 0.3, 0.35)
+
+
+func _on_honey_changed(_new: int, _delta: int, _reason: StringName) -> void:
+	if _active:
+		_update_color()
 
 
 func _on_preview_started(building_data: Resource) -> void:

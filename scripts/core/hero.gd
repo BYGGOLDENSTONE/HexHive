@@ -18,7 +18,7 @@ var _speed_multiplier: float = 1.5
 
 ## -- Combat stats --
 @export var max_hp: float = 100.0
-@export var attack_damage: float = 15.0
+@export var attack_damage: float = 10.0
 @export var attack_range: float = 3.5
 @export var attack_speed: float = 1.5
 @export var respawn_delay: float = 3.0
@@ -225,10 +225,11 @@ func _update_hex_tracking() -> void:
 # -- Combat --
 
 func _find_nearest_enemy() -> Node3D:
-	var tree := get_tree()
-	if tree == null:
+	if hex_grid == null:
 		return null
-	var enemies: Array = tree.get_nodes_in_group(&"enemies")
+	# Spatial cache lookup — only search hex tiles within the attack range.
+	var hex_radius: int = int(ceil(attack_range / hex_grid.hex_size)) + 1
+	var enemies: Array = hex_grid.get_enemies_in_hex_radius(current_hex, hex_radius)
 	var best: Node3D = null
 	var best_d: float = INF
 	for e in enemies:

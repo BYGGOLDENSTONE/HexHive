@@ -24,6 +24,7 @@ func _ready() -> void:
 	SignalBus.phase_changed.connect(_on_phase_changed)
 	SignalBus.build_preview_started.connect(_on_build_preview_started)
 	SignalBus.build_preview_ended.connect(_on_build_preview_ended)
+	SignalBus.honey_changed.connect(_on_honey_changed)
 
 	_populate_buttons()
 	# Start hidden (game starts at night but we show after a brief delay)
@@ -31,6 +32,7 @@ func _ready() -> void:
 	panel.visible = false
 	# Night 0 auto-show
 	call_deferred("_show_menu")
+	call_deferred("_refresh_affordability")
 
 
 func _populate_buttons() -> void:
@@ -46,12 +48,20 @@ func _populate_buttons() -> void:
 		_building_ids.append(data.id)
 
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(130, 60)
-		btn.text = "%s\n%s" % [data.display_name, data.description]
+		btn.custom_minimum_size = Vector2(150, 72)
+		var cost: int = data.get_cost(1)
+		var cost_str: String = ""
+		if cost > 0:
+			cost_str = "  %d " % cost  # honey icon char added after
+			cost_str = "\n[%d honey]" % cost
+		else:
+			cost_str = "\n[free]"
 
 		# Shortcut number label
 		if i < _quick_actions.size():
-			btn.text = "[%d] %s\n%s" % [i + 1, data.display_name, data.description]
+			btn.text = "[%d] %s%s\n%s" % [i + 1, data.display_name, cost_str, data.description]
+		else:
+			btn.text = "%s%s\n%s" % [data.display_name, cost_str, data.description]
 
 		btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
 
@@ -158,3 +168,28 @@ func _hide_menu() -> void:
 	_slide_tween.set_trans(Tween.TRANS_CUBIC)
 	_slide_tween.tween_property(panel, "modulate:a", 0.0, 0.3)
 	_slide_tween.tween_callback(func(): panel.visible = false)
+
+
+func _on_honey_changed(_new_amount: int, _delta: int, _reason: StringName) -> void:
+	_refresh_affordability()
+
+
+func _refresh_affordability() -> void:
+	# Gray out buttons whose cost exceeds the player's current honey.
+	var current: int = EconomyManager.get_honey()
+	for i in range(_building_ids.size()):
+		if i >= button_container.get_child_count():
+			break
+		var btn: Button = button_container.get_child(i) as Button
+		if btn == null:
+			continue
+		var data: Resource = BuildingRegistry.get_building(_building_ids[i])
+		if data == null:
+			continue
+		var cost: int = data.get_cost(1)
+		var affordable: bool = cost <= current
+		btn.disabled = not affordable
+		if affordable:
+			btn.modulate = Color.WHITE
+		else:
+			btn.modulate = Color(0.65, 0.6, 0.55, 0.85)

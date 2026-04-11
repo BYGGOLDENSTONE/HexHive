@@ -29,6 +29,11 @@ extends Resource
 ## Time after spawn before AI is enabled (lets fade-in animation play).
 @export var spawn_delay: float = 0.25
 
+# -- Economy --
+
+## Honey dropped when this enemy dies.
+@export var honey_drop: int = 0
+
 # -- 3D Model --
 
 ## Path to the GLB model scene. Empty = no visual.
@@ -42,12 +47,3 @@ extends Resource
 
 ## Material tint override (white = no tint, use model's own materials).
 @export var material_tint: Color = Color.WHITE
-
-# -- Legacy 2D fields (kept for .tres compat, ignored at runtime) --
-@export var visual_size: float = 18.0
-@export var sprite_dir: StringName = &""
-@export var sprite_scale_factor: float = 2.4
-@export var body_color: Color = Color(0.95, 0.85, 0.2, 1.0)
-@export var accent_color: Color = Color(0.1, 0.08, 0.05, 1.0)
-@export var wing_color: Color = Color(0.95, 0.95, 1.0, 0.55)
-@export var eye_color: Color = Color(1.0, 0.3, 0.2, 1.0)

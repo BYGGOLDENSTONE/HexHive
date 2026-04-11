@@ -49,6 +49,24 @@ func _validate_buildings() -> void:
 			if data.attack_speed_per_level.size() != expected:
 				_warnings.append("Building '%s': attack_speed_per_level has %d entries, expected %d" % [data.id, data.attack_speed_per_level.size(), expected])
 
+		# Economy arrays.
+		if data.cost_per_level.size() != expected:
+			_warnings.append("Building '%s': cost_per_level has %d entries, expected %d" % [data.id, data.cost_per_level.size(), expected])
+		for i in range(data.cost_per_level.size()):
+			if data.cost_per_level[i] < 0:
+				_issues.append("Building '%s' L%d has negative cost: %d" % [data.id, i + 1, data.cost_per_level[i]])
+
+		if data.honey_per_round_per_level.size() != expected:
+			_warnings.append("Building '%s': honey_per_round_per_level has %d entries, expected %d" % [data.id, data.honey_per_round_per_level.size(), expected])
+		for i in range(data.honey_per_round_per_level.size()):
+			if data.honey_per_round_per_level[i] < 0:
+				_issues.append("Building '%s' L%d has negative honey income: %d" % [data.id, i + 1, data.honey_per_round_per_level[i]])
+
+		# Economy tag consistency.
+		var has_economy_tag: bool = &"economy" in data.tags or &"production" in data.tags
+		if data.is_economy() and not has_economy_tag:
+			_warnings.append("Building '%s' produces honey but has no economy/production tag" % data.id)
+
 		# Offensive tag check.
 		var has_offense_tag: bool = &"defense" in data.tags or &"ranged" in data.tags
 		if data.is_offensive() and not has_offense_tag:
@@ -90,6 +108,8 @@ func _validate_enemies() -> void:
 			_warnings.append("Enemy '%s' has non-positive attack_speed: %.2f" % [data.id, data.attack_speed])
 		if data.attack_range <= 0.0:
 			_warnings.append("Enemy '%s' has non-positive attack_range: %.2f" % [data.id, data.attack_range])
+		if data.honey_drop < 0:
+			_issues.append("Enemy '%s' has negative honey_drop: %d" % [data.id, data.honey_drop])
 
 
 func _validate_model_files() -> void:

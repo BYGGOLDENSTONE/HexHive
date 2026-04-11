@@ -13,5 +13,7 @@ max_hp_per_level = Array[float]([60.0, 90.0, 130.0])
 attack_damage_per_level = Array[float]([10.0, 15.0, 22.0])
 attack_range_per_level = Array[float]([3.5, 4.0, 4.6])
 attack_speed_per_level = Array[float]([1.0, 1.3, 1.7])
+cost_per_level = Array[int]([10, 30, 70])
+honey_per_round_per_level = Array[int]([0, 0, 0])
 model_path = "res://assets/models/buildings/honey_turret/tower.glb"
 model_y_offset = 0.47

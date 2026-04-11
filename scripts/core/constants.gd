@@ -7,7 +7,7 @@ extends RefCounted
 const HERO_MOVE_SPEED: float = 4.0
 const HERO_NIGHT_SPEED_MULTIPLIER: float = 1.5
 const HERO_MAX_HP: float = 100.0
-const HERO_ATTACK_DAMAGE: float = 15.0
+const HERO_ATTACK_DAMAGE: float = 10.0
 const HERO_ATTACK_RANGE: float = 3.5
 const HERO_ATTACK_SPEED: float = 1.5
 const HERO_RESPAWN_DELAY: float = 3.0
@@ -50,6 +50,9 @@ const WAVE_WASP_PER_DAY: int = 2
 const WAVE_HORNET_START_DAY: int = 2
 const WAVE_CLEAR_DELAY: float = 0.6
 const WAVE_SPAWN_PICK_ATTEMPTS: int = 12
+
+# -- Victory / Run Length --
+const VICTORY_DAY: int = 10
 
 # -- Visual Effects --
 const FLASH_DURATION: float = 0.18

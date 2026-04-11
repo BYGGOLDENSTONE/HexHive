@@ -44,6 +44,18 @@ extends Resource
 ## True if this building can be destroyed.
 @export var destructible: bool = true
 
+# -- Economy --
+
+## Honey cost to place this building at each level.
+## Index 0 = L1 placement cost, Index 1 = upgrade L1→L2, Index 2 = upgrade L2→L3.
+## Length should match max_level. Empty or 0 = free.
+@export var cost_per_level: Array[int] = [0]
+
+## Honey income granted once per combat round (when the day's wave is cleared).
+## Flower Garden etc. pay out at the end of each day, not during combat.
+## Length should match max_level. 0 = no income.
+@export var honey_per_round_per_level: Array[int] = [0]
+
 # -- 3D Model --
 
 ## Path to the GLB model scene. Empty = use procedural placeholder.
@@ -54,13 +66,6 @@ extends Resource
 
 ## Vertical offset for the model (positive = up).
 @export var model_y_offset: float = 0.0
-
-# -- Legacy 2D fields (kept for .tres compat, ignored at runtime) --
-@export var level_colors: Array[Color] = []
-@export var level_accent_colors: Array[Color] = []
-@export var sprite_path: String = ""
-@export var sprite_scale: Vector2 = Vector2(1.0, 1.0)
-@export var sprite_offset: Vector2 = Vector2(0.0, 0.0)
 
 
 ## Get max HP for a given level (1-indexed, clamped to data length).
@@ -99,5 +104,31 @@ func get_attack_speed(level: int) -> float:
 func is_offensive() -> bool:
 	for d in attack_damage_per_level:
 		if d > 0.0:
+			return true
+	return false
+
+
+## Get the honey cost to place at L1 or upgrade to the given level.
+## level=1 returns placement cost; level=2 returns L1→L2 upgrade cost; etc.
+func get_cost(level: int) -> int:
+	if cost_per_level.is_empty():
+		return 0
+	var idx: int = clampi(level - 1, 0, cost_per_level.size() - 1)
+	return cost_per_level[idx]
+
+
+## Get the per-round honey income for the given level. 0 if none.
+## Paid out at the end of each day when the wave is cleared.
+func get_honey_per_round(level: int) -> int:
+	if honey_per_round_per_level.is_empty():
+		return 0
+	var idx: int = clampi(level - 1, 0, honey_per_round_per_level.size() - 1)
+	return honey_per_round_per_level[idx]
+
+
+## Returns true if this building produces honey income at any level.
+func is_economy() -> bool:
+	for v in honey_per_round_per_level:
+		if v > 0:
 			return true
 	return false

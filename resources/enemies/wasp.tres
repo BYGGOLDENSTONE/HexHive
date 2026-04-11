@@ -6,8 +6,9 @@
 script = ExtResource("1")
 id = &"wasp"
 display_name = "Wasp"
-tags = Array[StringName]([&"melee", &"swarm", &"fast"])
+tags = Array[StringName]([&"flying", &"swarm", &"fast"])
 move_speed = 2.0
 attack_range = 0.8
+honey_drop = 3
 model_path = "res://assets/models/characters/wasp/enemybee.glb"
 model_scale = 0.5

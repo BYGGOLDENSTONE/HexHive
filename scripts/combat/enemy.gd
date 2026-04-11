@@ -4,6 +4,7 @@ extends Node3D
 ## and opportunistically engages the hero or turrets in range.
 
 const HealthScript = preload("res://scripts/combat/health.gd")
+const DamageTableScript = preload("res://scripts/combat/damage_table.gd")
 
 signal died_finished()
 
@@ -89,6 +90,10 @@ func _apply_material_tint(node: Node, tint: Color) -> void:
 
 func _ready() -> void:
 	add_to_group(&"enemies")
+	# Register with the spatial index so hero/turrets can query by hex.
+	_current_hex = HexHelper.world3d_to_hex(position, hex_grid.hex_size) if hex_grid else Vector2i.ZERO
+	if hex_grid:
+		hex_grid.register_enemy_at(_current_hex, self)
 	# Spawn animation: scale from zero.
 	scale = Vector3.ZERO
 	var tw := create_tween()
@@ -152,6 +157,8 @@ func _physics_process(delta: float) -> void:
 func _update_hex_tracking() -> void:
 	var hex: Vector2i = HexHelper.world3d_to_hex(position, hex_grid.hex_size)
 	if hex != _current_hex:
+		if hex_grid:
+			hex_grid.move_enemy(_current_hex, hex, self)
 		_current_hex = hex
 
 
@@ -165,7 +172,7 @@ func _retarget() -> void:
 
 	_current_hex = HexHelper.world3d_to_hex(position, hex_grid.hex_size)
 
-	# 1) Opportunity threats.
+	# 1) Opportunity threats — hero within short range.
 	var hero: Node3D = _get_hero()
 	if hero != null and not _hero_is_dead(hero):
 		var hero_hex: Vector2i = HexHelper.world3d_to_hex(hero.global_position, hex_grid.hex_size)
@@ -173,21 +180,53 @@ func _retarget() -> void:
 			current_target = hero
 			return
 
-	# 2) Obstacle in path to Hive.
-	var path: Array[Vector2i] = HexHelper.get_line(_current_hex, Vector2i.ZERO)
-	for hex in path:
-		if hex == _current_hex:
-			continue
-		var tile: HexTile = hex_grid.get_tile(hex)
-		if tile == null:
-			continue
-		if tile.has_building and tile.building != null:
-			current_target = tile.building as Node3D
+	# 2) Try to walk to the Hive with real A* pathfinding.
+	# If a building blocks the walkable path, attack the first blocker.
+	var path: Array[Vector2i] = hex_grid.find_path(_current_hex, Vector2i.ZERO, 0)
+	if path.is_empty():
+		# No walkable path — something is blocking us. Scan neighbors for the
+		# closest building and engage it to open the route.
+		var blocker: Node3D = _find_closest_blocking_building()
+		if blocker != null:
+			current_target = blocker
 			return
+	else:
+		# Path exists. Check whether any step has a building occupying it;
+		# if so, that building is the direct obstacle we should attack.
+		for hex in path:
+			if hex == _current_hex:
+				continue
+			var tile: HexTile = hex_grid.get_tile(hex)
+			if tile == null:
+				continue
+			if tile.has_building and tile.building != null and tile.building != _hive_node:
+				current_target = tile.building as Node3D
+				return
 
 	# 3) Default — Hive.
 	if _hive_node != null and is_instance_valid(_hive_node):
 		current_target = _hive_node
+
+
+func _find_closest_blocking_building() -> Node3D:
+	# Ring search: look outward for the nearest building that's adjacent
+	# to a walkable tile we can path through.
+	for radius in range(1, 8):
+		var ring: Array[Vector2i] = HexHelper.get_hex_ring(_current_hex, radius)
+		var closest: Node3D = null
+		var closest_dist: int = 99999
+		for coord in ring:
+			var tile: HexTile = hex_grid.get_tile(coord)
+			if tile == null:
+				continue
+			if tile.has_building and tile.building != null and tile.building != _hive_node:
+				var d: int = HexHelper.distance(_current_hex, coord)
+				if d < closest_dist:
+					closest_dist = d
+					closest = tile.building as Node3D
+		if closest != null:
+			return closest
+	return null
 
 
 func _get_hero() -> Node3D:
@@ -215,7 +254,16 @@ func _try_attack(delta: float) -> void:
 	if current_target == null or not is_instance_valid(current_target):
 		return
 	if current_target.has_method("take_damage"):
-		current_target.take_damage(data.attack_damage)
+		# Apply tag-based damage modifiers (melee enemy tags × target tags).
+		var attacker_tags: Array = ["melee"] as Array
+		for t in data.tags:
+			attacker_tags.append(String(t))
+		var target_tags: Array = []
+		if "tags" in current_target:
+			for t in current_target.tags:
+				target_tags.append(String(t))
+		var final_dmg: float = DamageTableScript.compute(data.attack_damage, attacker_tags, target_tags)
+		current_target.take_damage(final_dmg)
 		_attack_cooldown = 1.0 / maxf(data.attack_speed, 0.01)
 
 
@@ -234,6 +282,12 @@ func _on_died() -> void:
 	if _is_dying:
 		return
 	_is_dying = true
+	# Remove from spatial index so nearest-enemy queries skip us immediately.
+	if hex_grid:
+		hex_grid.unregister_enemy_from(_current_hex, self)
+	# Drop honey to the player.
+	if data != null and data.honey_drop > 0:
+		EconomyManager.earn(data.honey_drop, &"enemy_killed")
 	SignalBus.enemy_died.emit(self)
 	_play_death()
 
@@ -268,8 +322,6 @@ func update_model_y_offset(y: float) -> void:
 
 
 # -- Flash tinting --
-
-var _flash_overrides: Array[Dictionary] = []
 
 func _set_flash_tint(color: Color) -> void:
 	if _model == null:

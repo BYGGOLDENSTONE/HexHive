@@ -16,6 +16,12 @@ var _current_category: Category = Category.HERO
 var _sliders: Dictionary = {}  # key -> {slider, value_label, default_value}
 var _dirty: bool = false
 
+## Undo stack — each entry is {key: String, from: float, to: float}.
+var _undo_stack: Array[Dictionary] = []
+const UNDO_STACK_MAX: int = 20
+## True while performing an undo so the value_changed handler doesn't push.
+var _suppress_push: bool = false
+
 
 func _ready() -> void:
 	layer = 16
@@ -93,6 +99,12 @@ func _build_ui() -> void:
 	apply_btn.pressed.connect(_on_apply_live)
 	apply_btn.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))
 	btn_box.add_child(apply_btn)
+
+	var undo_btn := Button.new()
+	undo_btn.text = "UNDO"
+	undo_btn.pressed.connect(_on_undo)
+	undo_btn.add_theme_color_override("font_color", Color(0.9, 0.85, 0.4))
+	btn_box.add_child(undo_btn)
 
 	add_child(_panel)
 
@@ -228,9 +240,13 @@ func _add_slider(key: String, label_text: String, default_val: float, min_val: f
 	value_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5))
 	hbox.add_child(value_label)
 
+	var last_val_ref := {"value": default_val}
 	slider.value_changed.connect(func(val: float) -> void:
 		value_label.text = _format_value(val)
 		_dirty = true
+		if not _suppress_push:
+			_push_undo(key, float(last_val_ref["value"]), val)
+		last_val_ref["value"] = val
 	)
 
 	_sliders[key] = {"slider": slider, "value_label": value_label, "default": default_val}
@@ -342,10 +358,39 @@ func _on_save() -> void:
 
 func _on_reset() -> void:
 	# Reload resources from disk.
+	_suppress_push = true
 	for key: String in _sliders:
 		var info: Dictionary = _sliders[key]
 		info["slider"].value = info["default"]
 		info["value_label"].text = _format_value(info["default"])
+	_suppress_push = false
+	_undo_stack.clear()
 	_dirty = false
 	if DevConsole:
 		DevConsole.log_system("Balance values reset to defaults.")
+
+
+func _push_undo(key: String, from_value: float, to_value: float) -> void:
+	if is_equal_approx(from_value, to_value):
+		return
+	_undo_stack.append({"key": key, "from": from_value, "to": to_value})
+	if _undo_stack.size() > UNDO_STACK_MAX:
+		_undo_stack.pop_front()
+
+
+func _on_undo() -> void:
+	if _undo_stack.is_empty():
+		if DevConsole:
+			DevConsole.log_warning("Undo stack is empty.")
+		return
+	var entry: Dictionary = _undo_stack.pop_back()
+	var key: String = entry["key"]
+	if not _sliders.has(key):
+		return
+	_suppress_push = true
+	var info: Dictionary = _sliders[key]
+	info["slider"].value = float(entry["from"])
+	info["value_label"].text = _format_value(float(entry["from"]))
+	_suppress_push = false
+	if DevConsole:
+		DevConsole.log_system("Undo: %s %.2f -> %.2f" % [key, float(entry["to"]), float(entry["from"])])

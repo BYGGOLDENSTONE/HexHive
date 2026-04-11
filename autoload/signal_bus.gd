@@ -106,5 +106,17 @@ signal wave_progress_changed(alive: int, total: int)
 ## Emitted when the game ends (Hive destroyed).
 signal game_over(final_day: int)
 
+## Emitted when the run is won (player reached victory condition, e.g. Day 10 cleared).
+signal run_won(final_day: int)
+
 ## Emitted when the player requests a restart from the game over screen.
 signal restart_requested()
+
+# -- Economy --
+
+## Emitted when the honey balance changes. delta can be positive (earn) or negative (spend).
+## reason is a short tag describing the source (e.g. &"enemy_killed", &"flower_income", &"build_cost").
+signal honey_changed(new_amount: int, delta: int, reason: StringName)
+
+## Emitted when the player attempts to spend more honey than they have.
+signal not_enough_honey(required: int, current: int)

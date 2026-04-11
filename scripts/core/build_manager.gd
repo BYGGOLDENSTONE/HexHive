@@ -73,6 +73,12 @@ func _on_tile_clicked(coord: Vector2i) -> void:
 	if not hex_grid.can_place_building(coord, _selected_data):
 		return
 
+	# Cost check — only when free_build is off.
+	var cost: int = _selected_data.get_cost(1)
+	if not free_build and not EconomyManager.can_afford(cost):
+		SignalBus.not_enough_honey.emit(cost, EconomyManager.get_honey())
+		return
+
 	_target_coord = coord
 	_hover_coord = null
 
@@ -113,7 +119,17 @@ func _on_upgrade_requested(coord: Vector2i) -> void:
 	var building: Variant = hex_grid.get_building_at(coord)
 	if building == null or not building.has_method("upgrade"):
 		return
+	# Cost check — the cost to reach the next level is stored at index (current_level).
+	var next_level: int = building.level + 1
+	if next_level > building.data.max_level:
+		return
+	var cost: int = building.data.get_cost(next_level)
+	if not free_build and not EconomyManager.can_afford(cost):
+		SignalBus.not_enough_honey.emit(cost, EconomyManager.get_honey())
+		return
 	if building.upgrade():
+		if not free_build and cost > 0:
+			EconomyManager.spend(cost, &"upgrade_%s" % building.data.id)
 		SignalBus.building_upgraded.emit(coord, building.level)
 
 
@@ -124,6 +140,15 @@ func _execute_build() -> void:
 
 	var coord: Vector2i = _target_coord as Vector2i
 	var world_pos: Vector3 = hex_grid.hex_to_world(coord)
+
+	# Final cost check and spend (cost was already validated at click time).
+	var cost: int = _selected_data.get_cost(1)
+	if not free_build and cost > 0:
+		if not EconomyManager.spend(cost, &"build_%s" % _selected_data.id):
+			# Shouldn't happen because we checked earlier, but guard anyway.
+			_target_coord = null
+			_state = BuildState.PREVIEWING
+			return
 
 	var building: Node3D = _building_scene.instantiate() as Node3D
 	building.setup(_selected_data, coord, world_pos, hex_grid.hex_size)

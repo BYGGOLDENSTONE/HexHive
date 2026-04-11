@@ -13,6 +13,8 @@
 [ext_resource type="Script" uid="uid://civp27pdtg0k6" path="res://scripts/combat/wave_manager.gd" id="12"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hive_hp_bar.tscn" id="13"]
 [ext_resource type="PackedScene" path="res://scenes/ui/game_over_screen.tscn" id="14"]
+[ext_resource type="PackedScene" path="res://scenes/ui/honey_hud.tscn" id="20"]
+[ext_resource type="PackedScene" path="res://scenes/ui/onboarding_overlay.tscn" id="21"]
 [ext_resource type="Script" uid="uid://doy4qa4flndbh" path="res://scripts/core/day_night_visual.gd" id="15"]
 [ext_resource type="PackedScene" path="res://scenes/ui/model_scale_editor.tscn" id="16"]
 [ext_resource type="PackedScene" path="res://scenes/ui/debug_overlay.tscn" id="17"]
@@ -69,11 +71,15 @@ script = ExtResource("15")
 
 [node name="HiveHpBar" parent="." instance=ExtResource("13")]
 
+[node name="HoneyHud" parent="." instance=ExtResource("20")]
+
 [node name="BuildMenu" parent="." instance=ExtResource("10")]
 
 [node name="UpgradePopup" parent="." instance=ExtResource("11")]
 
 [node name="GameOverScreen" parent="." instance=ExtResource("14")]
+
+[node name="OnboardingOverlay" parent="." instance=ExtResource("21")]
 
 [node name="ModelScaleEditor" parent="." instance=ExtResource("16")]
 

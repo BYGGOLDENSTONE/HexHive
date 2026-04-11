@@ -20,6 +20,7 @@ func _ready() -> void:
 	SignalBus.hero_left_building.connect(_on_hero_left_building)
 	SignalBus.building_upgraded.connect(_on_building_upgraded)
 	SignalBus.phase_changed.connect(_on_phase_changed)
+	SignalBus.honey_changed.connect(_on_honey_changed)
 
 	_line_drawer = Control.new()
 	_line_drawer.name = "LineDrawer"
@@ -125,6 +126,12 @@ func _on_building_upgraded(coord: Vector2i, _new_level: int) -> void:
 func _on_phase_changed(phase: StringName) -> void:
 	if phase == &"day":
 		_clear_all_popups()
+
+
+func _on_honey_changed(_new_amount: int, _delta: int, _reason: StringName) -> void:
+	# Refresh all visible popups so the upgrade button affordability stays live.
+	for coord: Vector2i in _popups.keys():
+		_update_popup_display(coord)
 
 
 func _calculate_directions() -> void:
@@ -303,7 +310,18 @@ func _update_popup_display(coord: Vector2i) -> void:
 	if building.level < building.data.max_level:
 		if btn:
 			btn.visible = true
-			btn.text = "Upgrade to Lv%d" % (building.level + 1)
+			var next_level: int = building.level + 1
+			var cost: int = building.data.get_cost(next_level)
+			var affordable: bool = EconomyManager.can_afford(cost)
+			if cost > 0:
+				btn.text = "Upgrade Lv%d  (%d honey)" % [next_level, cost]
+			else:
+				btn.text = "Upgrade to Lv%d" % next_level
+			btn.disabled = not affordable
+			if affordable:
+				btn.modulate = Color.WHITE
+			else:
+				btn.modulate = Color(0.7, 0.65, 0.55, 0.9)
 		if max_label:
 			max_label.visible = false
 	else:
@@ -324,7 +342,8 @@ func _add_stat_line(stats_box: VBoxContainer, building: Node3D) -> void:
 	elif id == &"wall":
 		_add_stat(stats_box, "HP", "%d" % int(building.data.get_max_hp(lv)), Color(1.0, 0.5, 0.5))
 	elif id == &"flower_garden":
-		_add_stat(stats_box, "Income", "+%d/cycle" % (3 + lv * 2), Color(1.0, 0.85, 0.3))
+		_add_stat(stats_box, "Income", "%d /round" % building.data.get_honey_per_round(lv), Color(1.0, 0.85, 0.3))
+		_add_stat(stats_box, "HP", "%d" % int(building.data.get_max_hp(lv)), Color(1.0, 0.5, 0.5))
 	elif id == &"hive":
 		_add_stat(stats_box, "HP", "%d" % int(building.data.get_max_hp(lv)), Color(1.0, 0.5, 0.5))
 

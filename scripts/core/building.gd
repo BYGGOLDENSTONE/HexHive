@@ -14,7 +14,6 @@ var health: HealthScript
 
 var _model: Node3D
 var _flash_timer: float = 0.0
-var _pulse_phase: float = 0.0
 var _attack_cooldown: float = 0.0
 var _is_dying: bool = false
 var _hex_size: float = 2.0
@@ -36,6 +35,10 @@ func setup(building_data: Resource, coord: Vector2i, world_pos: Vector3, hex_siz
 	add_child(health)
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
+
+	# Economy buildings earn honey at the end of each combat round.
+	if data.is_economy():
+		SignalBus.day_wave_cleared.connect(_on_day_wave_cleared)
 
 	_load_model()
 
@@ -110,14 +113,24 @@ func _physics_process(delta: float) -> void:
 				_attack_cooldown = 1.0 / maxf(data.get_attack_speed(level), 0.01)
 
 
+func _on_day_wave_cleared() -> void:
+	if _is_dying or data == null:
+		return
+	var yield_amount: int = data.get_honey_per_round(level)
+	if yield_amount > 0:
+		EconomyManager.earn(yield_amount, &"flower_income")
+
+
 func _find_nearest_enemy_in_range() -> Node3D:
 	var range_wu: float = data.get_attack_range(level)
 	if range_wu <= 0.0:
 		return null
-	var tree := get_tree()
-	if tree == null:
+	# Spatial cache lookup — fetch the hex_grid autoload via the current scene.
+	var grid: HexGrid = get_tree().current_scene.get_node_or_null("HexGrid") as HexGrid
+	if grid == null:
 		return null
-	var enemies: Array = tree.get_nodes_in_group(&"enemies")
+	var hex_radius: int = int(ceil(range_wu / grid.hex_size)) + 1
+	var enemies: Array = grid.get_enemies_in_hex_radius(hex_coord, hex_radius)
 	var best: Node3D = null
 	var best_d: float = INF
 	for e in enemies:
@@ -209,14 +222,6 @@ func play_place_effect() -> void:
 	tw.set_ease(Tween.EASE_OUT)
 	tw.set_trans(Tween.TRANS_BACK)
 	tw.tween_property(self, "scale", Vector3.ONE, 0.35)
-
-
-func refresh_sprite() -> void:
-	# Kept for API compat, rebuilds model.
-	if _model:
-		_model.queue_free()
-		_model = null
-	_load_model()
 
 
 # -- Scale editor support --

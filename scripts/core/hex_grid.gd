@@ -4,6 +4,7 @@ extends Node3D
 ## Hex grid lives on the XZ plane; Y axis is used for elevation.
 
 const _MapGen := preload("res://scripts/core/map_generator.gd")
+const _PriorityQueue := preload("res://scripts/utils/priority_queue.gd")
 
 signal tile_hovered(coord: Vector2i)
 signal tile_unhovered()
@@ -25,6 +26,15 @@ var slot_radius: float
 ## All tiles indexed by axial coordinate.
 var tiles: Dictionary = {}  # Dictionary[Vector2i, HexTile]
 
+## Spatial index: hex coord -> Array of enemy Node3D currently occupying that hex.
+## Maintained by Enemy.gd via register_enemy_at / unregister_enemy_from / move_enemy.
+## Lets hero and turrets skip per-frame get_nodes_in_group scans.
+var enemy_by_hex: Dictionary = {}  # Vector2i -> Array[Node3D]
+
+## Path cache: (start, goal, goal_range) -> Array[Vector2i].
+## Invalidated whenever a building is placed or destroyed.
+var _path_cache: Dictionary = {}
+
 ## Currently hovered tile coordinate (or null).
 var hovered_coord: Variant = null
 
@@ -40,6 +50,17 @@ func _ready() -> void:
 	_create_tiles()
 	if not _load_map_from_file():
 		_generate_terrain()
+	# Any building placement or destruction invalidates cached paths.
+	SignalBus.building_placed.connect(_on_grid_topology_changed)
+	SignalBus.building_destroyed.connect(_on_grid_topology_changed_node)
+
+
+func _on_grid_topology_changed(_id: StringName, _coord: Vector2i, _level: int) -> void:
+	_path_cache.clear()
+
+
+func _on_grid_topology_changed_node(_building: Node, _coord: Vector2i) -> void:
+	_path_cache.clear()
 
 
 ## Create all hex tiles with default GRASS terrain.
@@ -189,6 +210,7 @@ func place_building(coord: Vector2i, building_node: Node3D) -> bool:
 		return false
 	tile.has_building = true
 	tile.building = building_node
+	_path_cache.clear()
 	return true
 
 
@@ -198,6 +220,51 @@ func remove_building(coord: Vector2i) -> void:
 	if tile:
 		tile.has_building = false
 		tile.building = null
+		_path_cache.clear()
+
+
+# -- Spatial cache: enemies indexed by hex --
+
+## Register an enemy node as occupying the given hex.
+func register_enemy_at(coord: Vector2i, enemy: Node3D) -> void:
+	if not enemy_by_hex.has(coord):
+		enemy_by_hex[coord] = []
+	var arr: Array = enemy_by_hex[coord]
+	if enemy not in arr:
+		arr.append(enemy)
+
+
+## Remove an enemy node from the given hex bucket.
+func unregister_enemy_from(coord: Vector2i, enemy: Node3D) -> void:
+	if not enemy_by_hex.has(coord):
+		return
+	var arr: Array = enemy_by_hex[coord]
+	arr.erase(enemy)
+	if arr.is_empty():
+		enemy_by_hex.erase(coord)
+
+
+## Move an enemy between hex buckets (old == new is a no-op).
+func move_enemy(old_coord: Vector2i, new_coord: Vector2i, enemy: Node3D) -> void:
+	if old_coord == new_coord:
+		return
+	unregister_enemy_from(old_coord, enemy)
+	register_enemy_at(new_coord, enemy)
+
+
+## Return all alive enemy nodes within `hex_radius` hex tiles of `center`.
+## Hex radius is approximate — callers may still do a final world-space distance check.
+func get_enemies_in_hex_radius(center: Vector2i, hex_radius: int) -> Array:
+	var result: Array = []
+	if hex_radius <= 0:
+		if enemy_by_hex.has(center):
+			result.append_array(enemy_by_hex[center])
+		return result
+	var coords: Array[Vector2i] = HexHelper.get_hexes_in_range(center, hex_radius)
+	for c in coords:
+		if enemy_by_hex.has(c):
+			result.append_array(enemy_by_hex[c])
+	return result
 
 
 ## Get the building on a tile (or null).
@@ -232,7 +299,8 @@ func get_all_building_coords() -> Array[Vector2i]:
 	return result
 
 
-## A* pathfinding across walkable tiles.
+## A* pathfinding across walkable tiles, with a heap-based open set
+## and a per-grid path cache invalidated on building topology changes.
 func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Vector2i]:
 	var empty: Array[Vector2i] = []
 	var start_tile: HexTile = get_tile(start)
@@ -241,33 +309,41 @@ func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Ve
 	if HexHelper.distance(start, goal) <= goal_range:
 		return [start] as Array[Vector2i]
 
-	var open_set: Array[Vector2i] = [start]
+	# Cache hit?
+	var cache_key: String = "%d,%d|%d,%d|%d" % [start.x, start.y, goal.x, goal.y, goal_range]
+	if _path_cache.has(cache_key):
+		return (_path_cache[cache_key] as Array[Vector2i]).duplicate()
+
+	var heap := _PriorityQueue.new()
+	heap.push(start, HexHelper.distance(start, goal))
 	var came_from: Dictionary = {}
 	var g_score: Dictionary = {start: 0}
-	var f_score: Dictionary = {start: HexHelper.distance(start, goal)}
+	var in_open: Dictionary = {start: true}
 
-	while not open_set.is_empty():
-		var current: Vector2i = open_set[0]
-		var current_idx: int = 0
-		for i in range(1, open_set.size()):
-			var node: Vector2i = open_set[i]
-			if int(f_score.get(node, 0x7fffffff)) < int(f_score.get(current, 0x7fffffff)):
-				current = node
-				current_idx = i
-		open_set.remove_at(current_idx)
+	while not heap.is_empty():
+		var current: Vector2i = heap.pop()
+		in_open.erase(current)
 
 		if HexHelper.distance(current, goal) <= goal_range:
-			return _reconstruct_path(came_from, current)
+			var path: Array[Vector2i] = _reconstruct_path(came_from, current)
+			_path_cache[cache_key] = path
+			return path.duplicate()
 
 		for neighbor in get_walkable_neighbors(current):
 			var tentative_g: int = int(g_score[current]) + 1
 			if tentative_g < int(g_score.get(neighbor, 0x7fffffff)):
 				came_from[neighbor] = current
 				g_score[neighbor] = tentative_g
-				f_score[neighbor] = tentative_g + HexHelper.distance(neighbor, goal)
-				if neighbor not in open_set:
-					open_set.append(neighbor)
+				var f: int = tentative_g + HexHelper.distance(neighbor, goal)
+				if not in_open.has(neighbor):
+					heap.push(neighbor, f)
+					in_open[neighbor] = true
+				else:
+					# Decrease key — push a duplicate; the stale entry will be skipped
+					# when popped because its g_score will be higher than cached.
+					heap.push(neighbor, f)
 
+	_path_cache[cache_key] = empty
 	return empty
 
 

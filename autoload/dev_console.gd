@@ -240,6 +240,8 @@ func _execute_command(raw: String) -> void:
 			_cmd_night()
 		"status":
 			_cmd_status()
+		"honey":
+			_cmd_honey(args)
 		_:
 			log_warning("Unknown command: '%s'. Type 'help' for available commands." % cmd)
 
@@ -257,6 +259,7 @@ func _cmd_help() -> void:
 	log_system("  day          - Force start day")
 	log_system("  night        - Force start night")
 	log_system("  status       - Show current game state")
+	log_system("  honey <N>    - Set honey balance")
 	log_system("  clear        - Clear console log")
 	log_system("  help         - Show this help")
 
@@ -399,6 +402,18 @@ func _cmd_night() -> void:
 		log_warning("Already in night phase.")
 
 
+func _cmd_honey(args: PackedStringArray) -> void:
+	if args.is_empty():
+		log_info("Current honey: %d" % EconomyManager.get_honey())
+		return
+	if not args[0].is_valid_int():
+		log_warning("Usage: honey <amount>")
+		return
+	var amount: int = args[0].to_int()
+	EconomyManager.set_honey(amount)
+	log_system("Honey set to %d." % amount)
+
+
 func _cmd_status() -> void:
 	var phase: String = "Day %d" % DayNightManager.day_number if DayNightManager.is_day() else "Night %d" % DayNightManager.night_number
 	log_system("Phase: %s" % phase)
@@ -423,6 +438,7 @@ func _cmd_status() -> void:
 		log_system("Buildings placed: %d" % buildings.get_child_count())
 
 	log_system("Time scale: %.2f" % Engine.time_scale)
+	log_system("Honey: %d" % EconomyManager.get_honey())
 
 
 func _get_hive() -> Variant:
@@ -470,4 +486,13 @@ func _connect_signals() -> void:
 	)
 	SignalBus.game_over.connect(func(final_day: int) -> void:
 		log_error("GAME OVER on Day %d." % final_day)
+	)
+	SignalBus.run_won.connect(func(final_day: int) -> void:
+		log_system("RUN WON on Day %d!" % final_day)
+	)
+	SignalBus.honey_changed.connect(func(new_amount: int, delta: int, reason: StringName) -> void:
+		if reason == &"initial" or reason == &"restart":
+			return
+		var sign_str: String = "+" if delta >= 0 else ""
+		log_info("Honey %s%d -> %d (%s)" % [sign_str, delta, new_amount, reason])
 	)
