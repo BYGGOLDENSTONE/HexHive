@@ -1,7 +1,0 @@
-[gd_scene format=3]
-
-[ext_resource type="Script" path="res://scripts/ui/tile_editor_panel.gd" id="1"]
-
-[node name="TileEditorPanel" type="CanvasLayer"]
-layer = 15
-script = ExtResource("1")

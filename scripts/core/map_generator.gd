@@ -18,8 +18,6 @@ const DEFAULTS: Dictionary = {
 	"forest_cluster_count": 8,
 	"forest_cluster_radius_min": 2,
 	"forest_cluster_radius_max": 4,
-	"flower_patch_count": 6,
-	"flower_patch_radius": 2,
 }
 
 
@@ -57,9 +55,6 @@ static func generate(tiles: Dictionary, config: Dictionary, _hex_size: float, ma
 
 	# Step 7: Place forest clusters.
 	_place_forests(tiles, rng, cfg, map_radius)
-
-	# Step 8: Place flower patches along paths.
-	_place_flowers(tiles, rng, path_dirs, cfg, map_radius)
 
 	# Step 9: Set hive tile.
 	if tiles.has(Vector2i.ZERO):
@@ -261,34 +256,6 @@ static func _place_forests(tiles: Dictionary, rng: RandomNumberGenerator, cfg: D
 				if ct.terrain == HexTile.TerrainType.GRASS and ct.elevation == 0:
 					if rng.randf() < 0.55:
 						ct.terrain = HexTile.TerrainType.FOREST
-
-
-# -- Step 8: Flowers --
-
-static func _place_flowers(tiles: Dictionary, rng: RandomNumberGenerator, path_dirs: Array[int], cfg: Dictionary, map_radius: int) -> void:
-	var patch_count: int = cfg["flower_patch_count"] as int
-	var patch_radius: int = cfg["flower_patch_radius"] as int
-	var choke_distance: int = cfg["choke_distance"] as int
-
-	for _i: int in range(patch_count):
-		# Pick a random path.
-		var dir_idx: int = path_dirs[rng.randi() % path_dirs.size()]
-		var dir_vec: Vector2i = HexHelper.DIRECTIONS[dir_idx]
-		# Pick a distance along the path (past choke, before edge).
-		var dist: int = rng.randi_range(choke_distance + 2, map_radius - 3)
-		var spine_hex: Vector2i = dir_vec * dist
-		if not tiles.has(spine_hex):
-			continue
-		# Offset slightly from spine for variety.
-		var offset_dir: int = rng.randi_range(0, 5)
-		var patch_center: Vector2i = spine_hex + HexHelper.DIRECTIONS[offset_dir] * rng.randi_range(0, 1)
-		var patch_hexes: Array[Vector2i] = HexHelper.get_hexes_in_range(patch_center, patch_radius)
-		for ph: Vector2i in patch_hexes:
-			if tiles.has(ph):
-				var ft: HexTile = tiles[ph]
-				if ft.terrain == HexTile.TerrainType.GRASS and ft.elevation == 0:
-					if rng.randf() < 0.45:
-						ft.terrain = HexTile.TerrainType.FLOWER
 
 
 # -- Step 10: Spawn Point Guarantee --

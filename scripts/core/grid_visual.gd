@@ -1,7 +1,8 @@
 class_name GridVisual
 extends Node3D
-## Renders the hex grid in 3D using instanced GLB/OBJ models for tiles.
-## Handles tile creation, hover highlights, and active hex indicators.
+## Renders the hex grid in 3D using instanced GLB models for tiles.
+## Supports elevation via cliff models and terrain-specific decorations.
+## Handles hover highlights and tile click signals for the map editor.
 
 ## Reference to the HexGrid node.
 @onready var hex_grid: HexGrid = %HexGrid
@@ -15,15 +16,14 @@ extends Node3D
 ## Scale applied to all tile models to fit hex_size.
 @export var tile_model_scale: Vector3 = Vector3(1.0, 1.0, 1.0)
 
-## -- Highlight Materials --
+## Fallback height per cliff layer when no model is loaded.
+@export var cliff_layer_height: float = 1.0
+
+## -- Highlight --
 var _hover_highlight: MeshInstance3D
-var _active_highlight: MeshInstance3D
 
-## Tile mesh instances keyed by coord.
+## Tile mesh instances keyed by coord. Each is a wrapper Node3D.
 var _tile_instances: Dictionary = {}  # Vector2i -> Node3D
-
-## Reference to the hero for active hex tracking.
-var _hero: Node3D = null
 
 ## Currently hovered hex coordinate (null if none).
 var _hovered_coord: Variant = null
@@ -34,11 +34,17 @@ var _ramp_corner_resource: Variant = null
 var _ramp_edge_resource: Variant = null
 var _cliff_resource: Variant = null
 
+## Cached AABB height of the unscaled 3-layer cliff model (measured once).
+var _cliff_model_height: float = 0.0
+
+## Cached AABB height of the greentile model (floor tile thickness).
+var _tile_model_height: float = 0.0
+
 
 func _ready() -> void:
-	_hero = get_tree().get_first_node_in_group(&"hero")
 	_load_scale_config()
 	_preload_resources()
+	_measure_model_heights()
 	_create_all_tiles()
 	_create_highlight_meshes()
 
@@ -54,6 +60,35 @@ func _preload_resources() -> void:
 		_cliff_resource = load(cliff_model_path)
 
 
+## Measure the natural heights of the tile and cliff models.
+## The cliff sits ON TOP of the floor tile, not overlapping it.
+func _measure_model_heights() -> void:
+	# Measure greentile (floor) height.
+	if _tile_resource != null:
+		var temp: Node3D = _instantiate_resource(_tile_resource)
+		if temp != null:
+			var aabb: AABB = HexHelper._compute_combined_aabb(temp, temp)
+			_tile_model_height = aabb.size.y if aabb.size.y > 0.001 else 0.1
+			temp.queue_free()
+
+	# Measure cliff model height.
+	if _cliff_resource == null:
+		_cliff_model_height = 3.0 * cliff_layer_height
+	else:
+		var temp: Node3D = _instantiate_resource(_cliff_resource)
+		if temp == null:
+			_cliff_model_height = 3.0 * cliff_layer_height
+		else:
+			var aabb: AABB = HexHelper._compute_combined_aabb(temp, temp)
+			_cliff_model_height = aabb.size.y if aabb.size.y > 0.001 else 3.0 * cliff_layer_height
+			temp.queue_free()
+
+	# Sync elevation_height to HexGrid.
+	# Cliff sits on top of the floor tile, so total elevated height =
+	# tile_height + cliff_height. Per-level = total / 3.
+	hex_grid.elevation_height = (_tile_model_height + _cliff_model_height) / 3.0
+
+
 func _create_all_tiles() -> void:
 	for coord: Vector2i in hex_grid.tiles:
 		var tile: HexTile = hex_grid.tiles[coord]
@@ -63,45 +98,98 @@ func _create_all_tiles() -> void:
 			_tile_instances[coord] = instance
 
 
+## Build the full visual for a single hex tile, including cliffs if elevated.
 func _create_tile_instance(tile: HexTile, coord: Vector2i) -> Node3D:
-	var world_pos: Vector3 = hex_grid.hex_to_world(coord)
-
-	# Wrapper node at the tile's world position; model goes inside.
+	# XZ position from hex coords; wrapper sits at Y=0 always.
+	var pixel: Vector2 = HexHelper.axial_to_pixel(coord, hex_grid.hex_size)
 	var wrapper := Node3D.new()
-	wrapper.position = world_pos
+	wrapper.position = Vector3(pixel.x, 0.0, pixel.y)
 
-	var model: Node3D = null
 	if tile.is_ramp:
-		model = _create_ramp_instance(tile)
+		var top_y: float = float(tile.elevation) * hex_grid.elevation_height
+		var ramp_model: Node3D = _create_ramp_instance(tile)
+		if ramp_model == null:
+			ramp_model = _create_fallback_tile()
+		ramp_model.scale = tile_model_scale
+		ramp_model.rotation.y = deg_to_rad(30)
+		ramp_model.position.y = top_y
+		wrapper.add_child(ramp_model)
+		HexHelper.auto_center_model(ramp_model)
+		_apply_terrain_tint(ramp_model, tile)
+	elif tile.elevation > 0 and _cliff_resource != null:
+		# Elevated tile: cliff sits ON TOP of floor level, greentile on top of cliff.
+		var cliff: Node3D = _create_cliff_column()
+		cliff.position.y = _tile_model_height  # Cliff starts above the floor surface.
+		wrapper.add_child(cliff)
+		# Greentile on top of cliff.
+		var top_y: float = _tile_model_height + _cliff_model_height
+		var top_model: Node3D = _instantiate_resource(_tile_resource)
+		if top_model == null:
+			top_model = _create_fallback_tile()
+		top_model.scale = tile_model_scale
+		top_model.rotation.y = deg_to_rad(30)
+		top_model.position.y = top_y
+		wrapper.add_child(top_model)
+		HexHelper.auto_center_model(top_model)
+		_apply_terrain_tint(top_model, tile)
 	else:
-		model = _instantiate_resource(_tile_resource)
+		# Ground-level tile: just greentile at Y=0.
+		var top_model: Node3D = _instantiate_resource(_tile_resource)
+		if top_model == null:
+			top_model = _create_fallback_tile()
+		top_model.scale = tile_model_scale
+		top_model.rotation.y = deg_to_rad(30)
+		top_model.position.y = 0.0
+		wrapper.add_child(top_model)
+		HexHelper.auto_center_model(top_model)
+		_apply_terrain_tint(top_model, tile)
 
-	if model == null:
-		model = _create_fallback_tile()
-
-	model.scale = tile_model_scale
-	model.rotation.y = deg_to_rad(30)  # Flat-top mesh → pointy-top orientation
-	wrapper.add_child(model)
-	HexHelper.auto_center_model(model)
-
-	# Apply terrain-specific tinting (replaces old elevation-only tint).
-	_apply_terrain_tint(model, tile)
-
-	# Add procedural decoration meshes based on terrain type.
+	# Procedural decorations on top.
 	_add_terrain_decoration(wrapper, tile, coord)
 
 	return wrapper
 
 
+## Create a cliff column using the model as-is (no Y-scaling).
+## Each cliff model represents a fixed number of layers at its natural size.
+## Currently only threelayercliff.glb exists; 1-layer and 2-layer models
+## will be added later and selected here based on elevation.
+func _create_cliff_column() -> Node3D:
+	var cliff: Node3D = _instantiate_resource(_cliff_resource)
+	if cliff == null:
+		return _create_fallback_cliff()
+
+	cliff.scale = tile_model_scale
+	cliff.rotation.y = deg_to_rad(30)
+	cliff.position.y = 0.0
+	HexHelper.auto_center_model(cliff)
+
+	return cliff
+
+
+## Fallback procedural cliff when no model is loaded.
+func _create_fallback_cliff() -> Node3D:
+	var mi := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = hex_grid.hex_size * 0.85
+	mesh.bottom_radius = hex_grid.hex_size * 0.9
+	mesh.height = _cliff_model_height if _cliff_model_height > 0.001 else 3.0
+	mesh.radial_segments = 6
+	mi.mesh = mesh
+	mi.position.y = mesh.height * 0.5
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.45, 0.38, 0.3)
+	mi.set_surface_override_material(0, mat)
+	return mi
+
+
 func _create_ramp_instance(tile: HexTile) -> Node3D:
-	# Choose ramp type based on exit direction
 	var resource: Variant = _ramp_corner_resource
 	if resource == null:
 		resource = _ramp_edge_resource
 	var instance: Node3D = _instantiate_resource(resource)
 	if instance == null:
 		return null
-	# Rotate ramp to face the exit direction
 	if tile.ramp_exit_dir >= 0:
 		var angle: float = tile.ramp_exit_dir * (TAU / 6.0)
 		instance.rotation.y = angle
@@ -121,7 +209,6 @@ func _instantiate_resource(res: Variant) -> Node3D:
 
 
 func _create_fallback_tile() -> Node3D:
-	# Simple flat hex mesh as fallback when no model is loaded.
 	var mi := MeshInstance3D.new()
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = hex_grid.hex_size
@@ -144,8 +231,6 @@ func _apply_terrain_tint(instance: Node3D, tile: HexTile) -> void:
 			tint = Color(0.6, 0.55, 0.5)
 		HexTile.TerrainType.FOREST:
 			tint = Color(0.55, 0.75, 0.4)
-		HexTile.TerrainType.FLOWER:
-			tint = Color(1.1, 1.0, 0.85)
 		HexTile.TerrainType.HIVE:
 			tint = Color(1.1, 0.95, 0.7)
 		HexTile.TerrainType.WATER:
@@ -153,7 +238,7 @@ func _apply_terrain_tint(instance: Node3D, tile: HexTile) -> void:
 		_:
 			tint = Color(1.0, 1.0, 1.0)
 
-	# Elevation brightness boost.
+	# Elevation brightness boost on the top surface.
 	if tile.elevation > 0 and not tile.is_ramp:
 		tint *= Color(1.15, 1.15, 1.15)
 
@@ -167,20 +252,16 @@ func _add_terrain_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) ->
 				_add_mountain_decoration(wrapper, tile, coord)
 		HexTile.TerrainType.FOREST:
 			_add_forest_decoration(wrapper, tile, coord)
-		HexTile.TerrainType.FLOWER:
-			_add_flower_decoration(wrapper, tile, coord)
 
 
 func _add_mountain_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> void:
 	var local_rng := RandomNumberGenerator.new()
 	local_rng.seed = coord.x * 7919 + coord.y * 6271
 
-	# 1-2 rock peaks per mountain tile.
 	var rock_count: int = local_rng.randi_range(1, 2)
 	for i: int in range(rock_count):
 		var mi := MeshInstance3D.new()
 		var mesh := CylinderMesh.new()
-		# Tapered cylinder for rock shape (wider base, narrow top).
 		mesh.bottom_radius = hex_grid.hex_size * (0.2 + local_rng.randf() * 0.15)
 		mesh.top_radius = mesh.bottom_radius * (0.15 + local_rng.randf() * 0.25)
 		mesh.height = hex_grid.hex_size * (0.5 + local_rng.randf() * 0.5)
@@ -192,7 +273,6 @@ func _add_mountain_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -
 		mi.set_surface_override_material(0, mat)
 		var base_y: float = float(tile.elevation) * hex_grid.elevation_height
 		mi.position.y = base_y + mesh.height * 0.5
-		# Random offset within hex.
 		var offset_angle: float = local_rng.randf() * TAU
 		var offset_dist: float = local_rng.randf() * hex_grid.hex_size * 0.25
 		mi.position.x = cos(offset_angle) * offset_dist
@@ -211,7 +291,6 @@ func _add_forest_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> 
 	for i: int in range(tree_count):
 		var tree := Node3D.new()
 
-		# Trunk: thin cylinder.
 		var trunk_mi := MeshInstance3D.new()
 		var trunk_mesh := CylinderMesh.new()
 		trunk_mesh.top_radius = 0.025
@@ -225,7 +304,6 @@ func _add_forest_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> 
 		trunk_mi.position.y = trunk_mesh.height * 0.5
 		tree.add_child(trunk_mi)
 
-		# Canopy: sphere.
 		var canopy_mi := MeshInstance3D.new()
 		var canopy_mesh := SphereMesh.new()
 		canopy_mesh.radius = 0.1 + local_rng.randf() * 0.08
@@ -243,7 +321,6 @@ func _add_forest_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> 
 		canopy_mi.position.y = trunk_mesh.height + canopy_mesh.radius * 0.6
 		tree.add_child(canopy_mi)
 
-		# Random position within hex.
 		var offset_angle: float = local_rng.randf() * TAU
 		var offset_dist: float = local_rng.randf() * hex_grid.hex_size * 0.35
 		tree.position.x = cos(offset_angle) * offset_dist
@@ -251,44 +328,6 @@ func _add_forest_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> 
 		tree.position.y = base_y
 
 		wrapper.add_child(tree)
-
-
-func _add_flower_decoration(wrapper: Node3D, tile: HexTile, coord: Vector2i) -> void:
-	var local_rng := RandomNumberGenerator.new()
-	local_rng.seed = coord.x * 8837 + coord.y * 5399
-
-	var flower_count: int = local_rng.randi_range(3, 6)
-	var base_y: float = float(tile.elevation) * hex_grid.elevation_height
-	var flower_colors: Array[Color] = [
-		Color(1.0, 0.85, 0.2),   # Golden yellow
-		Color(1.0, 0.6, 0.2),    # Warm orange
-		Color(0.95, 0.5, 0.7),   # Soft pink
-		Color(0.95, 0.95, 0.85), # Cream white
-		Color(0.85, 0.65, 0.95), # Lavender
-	]
-
-	for i: int in range(flower_count):
-		var mi := MeshInstance3D.new()
-		var mesh := SphereMesh.new()
-		mesh.radius = 0.03 + local_rng.randf() * 0.02
-		mesh.height = mesh.radius * 1.5
-		mesh.radial_segments = 6
-		mesh.rings = 3
-		mi.mesh = mesh
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = flower_colors[local_rng.randi() % flower_colors.size()]
-		mat.emission_enabled = true
-		mat.emission = mat.albedo_color * 0.3
-		mat.emission_energy_multiplier = 0.5
-		mi.set_surface_override_material(0, mat)
-
-		var offset_angle: float = local_rng.randf() * TAU
-		var offset_dist: float = local_rng.randf() * hex_grid.hex_size * 0.4
-		mi.position.x = cos(offset_angle) * offset_dist
-		mi.position.z = sin(offset_angle) * offset_dist
-		mi.position.y = base_y + 0.06
-
-		wrapper.add_child(mi)
 
 
 func _traverse_and_tint(node: Node, tint: Color) -> void:
@@ -305,15 +344,9 @@ func _traverse_and_tint(node: Node, tint: Color) -> void:
 
 
 func _create_highlight_meshes() -> void:
-	# Hover highlight — semi-transparent hex disc.
 	_hover_highlight = _create_hex_disc(Color(1.0, 0.85, 0.3, 0.3))
 	_hover_highlight.visible = false
 	add_child(_hover_highlight)
-
-	# Active hex highlight — hero's current tile.
-	_active_highlight = _create_hex_disc(Color(1.0, 0.7, 0.2, 0.2))
-	_active_highlight.visible = false
-	add_child(_active_highlight)
 
 
 func _create_hex_disc(color: Color) -> MeshInstance3D:
@@ -337,13 +370,11 @@ func _create_hex_disc(color: Color) -> MeshInstance3D:
 
 ## Rebuild a single tile's visual (used by map editor for live updates).
 func rebuild_tile(coord: Vector2i) -> void:
-	# Remove old instance.
 	if _tile_instances.has(coord):
 		var old: Node3D = _tile_instances[coord]
 		old.queue_free()
 		_tile_instances.erase(coord)
 
-	# Create new instance with current tile data.
 	var tile: HexTile = hex_grid.get_tile(coord)
 	if tile == null:
 		return
@@ -383,7 +414,6 @@ func update_tile_scale(new_scale: Vector3) -> void:
 
 func _process(_delta: float) -> void:
 	_handle_mouse()
-	_update_active_hex()
 
 
 func _handle_mouse() -> void:
@@ -409,24 +439,6 @@ func _handle_mouse() -> void:
 			_hovered_coord = null
 			_hover_highlight.visible = false
 			hex_grid.tile_unhovered.emit()
-
-
-func _update_active_hex() -> void:
-	if _hero == null:
-		_hero = get_tree().get_first_node_in_group(&"hero")
-	if _hero == null or not is_instance_valid(_hero):
-		_active_highlight.visible = false
-		return
-	if "current_hex" not in _hero:
-		return
-	var active_coord: Vector2i = _hero.current_hex
-	var tile: HexTile = hex_grid.get_tile(active_coord)
-	if tile:
-		var tile_pos: Vector3 = hex_grid.hex_to_world(active_coord)
-		_active_highlight.position = tile_pos + Vector3(0, 0.04, 0)
-		_active_highlight.visible = true
-	else:
-		_active_highlight.visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:

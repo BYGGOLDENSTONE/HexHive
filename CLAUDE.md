@@ -99,14 +99,16 @@ res://
 > Future phases: units, roguelite choices, procedural maps, meta-progression, bosses.
 
 ## Current Status
-- **Phase:** 3D migration complete — dev tooling suite added
-- **Completed:** Project setup, GDD, market research, roadmap, Phase 1–5, 2D sprite pipeline, **3D migration: full engine conversion**, **3D model pipeline fix**, **Dev tools suite (console, debug overlay, perf monitor, balance panel, resource validator)**
+- **Phase:** Map editor & cliff system rewrite complete
+- **Completed:** Project setup, GDD, market research, roadmap, Phase 1–5, 2D sprite pipeline, **3D migration**, **Dev tools suite**, **Map Editor v2 + Cliff visual system + Elevation pathfinding**
 - **Next:** Phase 6 — Economy (Honey)
 
 ## Known Issues / Backlog
 > Tracked bugs and improvements to address before/during the next phase.
 
-- **Wall/FlowerGarden/Hive models missing** — using procedural cylinder placeholders until Asset Forge models are produced
+- **Wall/Hive models missing** — using procedural cylinder placeholders until Asset Forge models are produced
+- **1-layer and 2-layer cliff models needed** — currently only `threelayercliff.glb` exists; elevation raise always goes to level 3
+- **Wide ramp model needed** — current `hex_ramp.obj` is too small; need hex-sized ramp tile for wide staircases
 - **Ramp models** — hex_ramp/hex_ramp_edge are smaller than greentile; need scaling or replacement
 - **Model scale fine-tuning** — use in-game SCALE editor (F2) to adjust entity sizes visually
 
@@ -166,9 +168,24 @@ All development tools are non-intrusive — they don't affect gameplay when inac
 - **Checks:** Duplicate IDs, empty IDs, per-level array length vs max_level, HP > 0, valid terrain types, model file existence, offensive tag consistency
 - **Reports to:** DevConsole (log_error/log_warning) + Godot output (push_error/push_warning)
 
+### Map Editor (`scripts/ui/map_editor.gd`) — Toggle: F6 (in-game) / Standalone scene
+- **Standalone scene:** `scenes/main/map_editor_scene.tscn` — dedicated editor with free camera
+- **In-game overlay:** F6 toggle during gameplay
+- **Tools:** Paint Terrain (T), Raise Elevation (Q), Lower Elevation (E), Ramp Paint (R), Flood Fill (F), Erase (X)
+- **Terrain types:** GRASS, MOUNTAIN, WATER, FOREST, HIVE (FLOWER removed)
+- **Elevation:** Currently binary — Raise snaps to 3 (3-layer cliff), Lower snaps to 0. Will support 1/2/3 when models are added
+- **Cliff system:** `threelayercliff.glb` placed as-is (no scaling) on top of floor tile. Greentile sits on cliff top
+- **Brush:** Size 1-7, hex-shaped, +/- keys to adjust. Preview shows affected tiles before painting
+- **Symmetry:** Off / 2-fold / 3-fold / 6-fold rotation around map center
+- **Undo/Redo:** Ctrl+Z / Ctrl+Y, 50-step history
+- **Save/Load:** Named map slots in `resources/maps/*.json`. Save, Load, Delete buttons + map list
+- **Eyedropper:** Right-click samples tile properties
+- **Clear All:** Resets entire map to GRASS elevation 0
+- **Generate Procedural:** Runs the old 3-path Thronefall-style generator (for reference/starting point)
+- **Pathfinding:** Elevation differences are impassable without ramps. `max_climb` parameter per entity for future flying/climbing units
+
 ### Existing Tools (pre-dev-suite)
 - **Model Scale Editor** (`scripts/ui/model_scale_editor.gd`) — F2, adjusts 3D model scale/offset
-- **Tile Editor** (`scripts/ui/tile_editor_panel.gd`) — Tile visual properties
 
 ### Key Bindings Summary
 | Key | Tool |
@@ -178,6 +195,7 @@ All development tools are non-intrusive — they don't affect gameplay when inac
 | F3 | Debug Overlay |
 | F4 | Performance Monitor |
 | F5 | Balance Panel |
+| F6 | Map Editor (in-game) |
 
 ### Autoload Boot Order
 1. `SignalBus` — Signal definitions (no dependencies)

@@ -42,14 +42,21 @@ var hovered_coord: Variant = null
 var effective_seed: int = 0
 
 
-const MAP_SAVE_PATH: String = "res://resources/maps/custom_map.json"
+const MAPS_DIR: String = "res://resources/maps/"
+const DEFAULT_MAP_NAME: String = "custom_map"
+
+## Currently loaded map name (without extension).
+var current_map_name: String = DEFAULT_MAP_NAME
 
 
 func _ready() -> void:
 	slot_radius = hex_size * 3.0 / 5.0
 	_create_tiles()
-	if not _load_map_from_file():
-		_generate_terrain()
+	# Load saved map if one exists; otherwise leave all tiles as default GRASS.
+	# The procedural generator is no longer auto-called. Use the Map Editor
+	# (standalone scene) to create and save maps, or call reset_to_procedural()
+	# explicitly from a dev console command.
+	_load_map_from_file()
 	# Any building placement or destruction invalidates cached paths.
 	SignalBus.building_placed.connect(_on_grid_topology_changed)
 	SignalBus.building_destroyed.connect(_on_grid_topology_changed_node)
@@ -78,8 +85,20 @@ func _generate_terrain() -> void:
 	effective_seed = _MapGen.generate(tiles, config, hex_size, map_radius)
 
 
+## Get the file path for a named map slot.
+func _get_map_path(map_name: String = "") -> String:
+	if map_name.is_empty():
+		map_name = current_map_name
+	return MAPS_DIR + map_name + ".json"
+
+
 ## Save all non-default tile data to a JSON file.
-func save_map_to_file() -> bool:
+## If map_name is empty, uses the current map name.
+func save_map_to_file(map_name: String = "") -> bool:
+	if map_name.is_empty():
+		map_name = current_map_name
+	var save_path: String = _get_map_path(map_name)
+
 	var map_data: Array = []
 	for coord: Vector2i in tiles:
 		var tile: HexTile = tiles[coord]
@@ -97,22 +116,28 @@ func save_map_to_file() -> bool:
 			map_data.append(entry)
 
 	var json_str: String = JSON.stringify(map_data, "\t")
-	var file := FileAccess.open(MAP_SAVE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	if file == null:
-		push_error("Failed to save map: cannot open " + MAP_SAVE_PATH)
+		push_error("Failed to save map: cannot open " + save_path)
 		return false
 	file.store_string(json_str)
 	file.close()
-	print("[HexGrid] Map saved to %s (%d modified tiles)" % [MAP_SAVE_PATH, map_data.size()])
+	current_map_name = map_name
+	print("[HexGrid] Map saved to %s (%d modified tiles)" % [save_path, map_data.size()])
 	return true
 
 
 ## Load map data from a JSON file. Returns true if loaded successfully.
-func _load_map_from_file() -> bool:
-	if not FileAccess.file_exists(MAP_SAVE_PATH):
+## If map_name is empty, uses the current map name.
+func load_map_from_file(map_name: String = "") -> bool:
+	if map_name.is_empty():
+		map_name = current_map_name
+	var load_path: String = _get_map_path(map_name)
+
+	if not FileAccess.file_exists(load_path):
 		return false
 
-	var file := FileAccess.open(MAP_SAVE_PATH, FileAccess.READ)
+	var file := FileAccess.open(load_path, FileAccess.READ)
 	if file == null:
 		return false
 	var json_str: String = file.get_as_text()
@@ -139,8 +164,42 @@ func _load_map_from_file() -> bool:
 			tile.is_ramp = d["is_ramp"] as bool
 			tile.ramp_exit_dir = d.get("ramp_exit_dir", -1) as int
 
-	print("[HexGrid] Map loaded from %s (%d modified tiles)" % [MAP_SAVE_PATH, map_data.size()])
+	current_map_name = map_name
+	print("[HexGrid] Map loaded from %s (%d modified tiles)" % [load_path, map_data.size()])
 	return true
+
+
+## List all saved map names (without .json extension).
+func get_saved_map_names() -> Array[String]:
+	var result: Array[String] = []
+	var dir := DirAccess.open(MAPS_DIR)
+	if dir == null:
+		return result
+	dir.list_dir_begin()
+	var file_name: String = dir.get_next()
+	while file_name != "":
+		if not dir.current_is_dir() and file_name.ends_with(".json"):
+			result.append(file_name.get_basename())
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	result.sort()
+	return result
+
+
+## Delete a saved map file. Returns true on success.
+func delete_map(map_name: String) -> bool:
+	var path: String = _get_map_path(map_name)
+	if not FileAccess.file_exists(path):
+		return false
+	var dir := DirAccess.open(MAPS_DIR)
+	if dir == null:
+		return false
+	return dir.remove(map_name + ".json") == OK
+
+
+## Private alias used internally at startup.
+func _load_map_from_file() -> bool:
+	return load_map_from_file()
 
 
 ## Reset all tiles to default GRASS and regenerate with procedural generator.
@@ -179,12 +238,27 @@ func hex_to_world(coord: Vector2i) -> Vector3:
 	return Vector3(pixel.x, y, pixel.y) + global_position
 
 
-## Get the walkable neighbors of a hex (tiles that exist and are walkable).
-func get_walkable_neighbors(coord: Vector2i) -> Array[Vector2i]:
+## Get the walkable neighbors of a hex, accounting for elevation.
+## max_climb: how many elevation levels an entity can traverse without a ramp.
+## Default 0 means only same-level or ramp connections are walkable.
+func get_walkable_neighbors(coord: Vector2i, max_climb: int = 0) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
+	var tile: HexTile = get_tile(coord)
+	if tile == null:
+		return result
 	for neighbor in HexHelper.get_neighbors(coord):
-		var tile: HexTile = get_tile(neighbor)
-		if tile and tile.is_walkable():
+		var ntile: HexTile = get_tile(neighbor)
+		if ntile == null or not ntile.is_walkable():
+			continue
+		# Elevation check: adjacent tiles with elevation diff > max_climb
+		# are IMPASSABLE unless one of them is a ramp.
+		var elev_diff: int = absi(tile.elevation - ntile.elevation)
+		if elev_diff > max_climb:
+			# Ramps bridge exactly 1 elevation level.
+			if elev_diff == 1 and (tile.is_ramp or ntile.is_ramp):
+				result.append(neighbor)
+			# else: impassable cliff face
+		else:
 			result.append(neighbor)
 	return result
 
@@ -301,7 +375,8 @@ func get_all_building_coords() -> Array[Vector2i]:
 
 ## A* pathfinding across walkable tiles, with a heap-based open set
 ## and a per-grid path cache invalidated on building topology changes.
-func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Vector2i]:
+## max_climb: elevation levels an entity can step without a ramp (default 0).
+func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0, max_climb: int = 0) -> Array[Vector2i]:
 	var empty: Array[Vector2i] = []
 	var start_tile: HexTile = get_tile(start)
 	if start_tile == null or not start_tile.is_walkable():
@@ -310,7 +385,7 @@ func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Ve
 		return [start] as Array[Vector2i]
 
 	# Cache hit?
-	var cache_key: String = "%d,%d|%d,%d|%d" % [start.x, start.y, goal.x, goal.y, goal_range]
+	var cache_key: String = "%d,%d|%d,%d|%d|%d" % [start.x, start.y, goal.x, goal.y, goal_range, max_climb]
 	if _path_cache.has(cache_key):
 		return (_path_cache[cache_key] as Array[Vector2i]).duplicate()
 
@@ -329,7 +404,7 @@ func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Ve
 			_path_cache[cache_key] = path
 			return path.duplicate()
 
-		for neighbor in get_walkable_neighbors(current):
+		for neighbor in get_walkable_neighbors(current, max_climb):
 			var tentative_g: int = int(g_score[current]) + 1
 			if tentative_g < int(g_score.get(neighbor, 0x7fffffff)):
 				came_from[neighbor] = current
@@ -339,8 +414,6 @@ func find_path(start: Vector2i, goal: Vector2i, goal_range: int = 0) -> Array[Ve
 					heap.push(neighbor, f)
 					in_open[neighbor] = true
 				else:
-					# Decrease key — push a duplicate; the stale entry will be skipped
-					# when popped because its g_score will be higher than cached.
 					heap.push(neighbor, f)
 
 	_path_cache[cache_key] = empty
